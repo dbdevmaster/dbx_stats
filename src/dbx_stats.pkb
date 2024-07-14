@@ -1,0 +1,867 @@
+CREATE OR REPLACE PACKAGE BODY dbx_stats AS
+
+    -- Function to check if trace is enabled
+    FUNCTION is_trace_enabled RETURN BOOLEAN IS
+        v_trace VARCHAR2(50);
+        v_manager dbx_stats_manager := dbx_stats_manager('trace');
+    BEGIN
+        v_trace := v_manager.get_setting();
+        RETURN (LOWER(v_trace) = 'enabled');
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN FALSE;
+    END is_trace_enabled;
+
+    
+    -- Function to check if debugging is enabled
+    FUNCTION is_debugging_enabled RETURN BOOLEAN IS
+        v_debugging VARCHAR2(50);
+        v_manager dbx_stats_manager := dbx_stats_manager('debugging');
+    BEGIN
+        v_debugging := v_manager.get_setting();
+        RETURN (LOWER(v_debugging) = 'enabled');
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RETURN FALSE;
+    END is_debugging_enabled;
+
+    -- Procedure to print debugging messages if debugging is enabled
+    PROCEDURE debugging(p_message VARCHAR2) IS
+    BEGIN
+        IF is_debugging_enabled() THEN
+            DBMS_OUTPUT.PUT_LINE(p_message);
+        END IF;
+    END debugging;
+
+    -- Autonomous procedure to create and run gather job
+    PROCEDURE create_gather_job(p_job_name VARCHAR2, p_schema_name VARCHAR2, p_instance_number NUMBER, p_max_job_runtime NUMBER) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        DBMS_SCHEDULER.CREATE_JOB(
+            job_name        => LOWER(p_job_name),
+            job_type        => 'PLSQL_BLOCK',
+            job_action      => 'BEGIN 
+                                DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
+                                DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
+                                DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || ''' || p_schema_name || ''' || '''');
+                                DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
+                                DBMS_APPLICATION_INFO.SET_MODULE(NULL, NULL);
+                                DBMS_APPLICATION_INFO.SET_CLIENT_INFO(NULL);
+                                END;',
+            start_date      => SYSTIMESTAMP,
+            end_date        => SYSTIMESTAMP + INTERVAL '1' MINUTE * p_max_job_runtime,
+            enabled         => TRUE,
+            comments        => 'Gather stats for schema ' || p_schema_name,
+            auto_drop       => FALSE
+        );
+
+        IF p_instance_number IS NOT NULL THEN
+            DBMS_SCHEDULER.SET_ATTRIBUTE(LOWER(p_job_name), 'INSTANCE_ID', p_instance_number);
+        END IF;
+
+        -- Run the job immediately
+        DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
+
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in create_gather_job: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+            ROLLBACK;
+    END create_gather_job;
+
+    -- Autonomous procedure to insert initial job record into the log table
+    PROCEDURE insert_job_record(p_schema_name VARCHAR2, p_job_name VARCHAR2, p_instance_number NUMBER, p_session_id VARCHAR2) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        INSERT INTO dbx_job_record_log (
+            schema_name, job_name, job_status, start_time, instance_number, session_id
+        ) VALUES (
+            p_schema_name, LOWER(p_job_name), 'QUEUED', SYSTIMESTAMP, p_instance_number, p_session_id
+        );
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in insert_job_record: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+            ROLLBACK;
+    END insert_job_record;
+
+    -- Autonomous procedure to update job record in the log table
+    PROCEDURE update_job_record(p_job_name VARCHAR2, p_status VARCHAR2, p_duration INTERVAL DAY TO SECOND DEFAULT NULL, p_dbms_scheduler_status VARCHAR2 DEFAULT NULL, p_dbms_scheduler_error NUMBER DEFAULT NULL, p_dbms_scheduler_info VARCHAR2 DEFAULT NULL) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        IF p_status = 'RUNNING' THEN
+            UPDATE dbx_job_record_log
+            SET job_status = p_status
+            WHERE job_name = LOWER(p_job_name);
+        ELSIF p_status = 'COMPLETED' THEN
+            UPDATE dbx_job_record_log
+            SET job_status = p_status, duration = p_duration, dbms_scheduler_status = p_dbms_scheduler_status, dbms_scheduler_error = p_dbms_scheduler_error, dbms_scheduler_info = p_dbms_scheduler_info
+            WHERE job_name = LOWER(p_job_name);
+        ELSIF p_status = 'STOPPED' THEN
+            UPDATE dbx_job_record_log
+            SET job_status = p_status, duration = p_duration, dbms_scheduler_status = p_dbms_scheduler_status, dbms_scheduler_error = p_dbms_scheduler_error, dbms_scheduler_info = p_dbms_scheduler_info
+            WHERE job_name = LOWER(p_job_name);
+        END IF;
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in update_job_record: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+            ROLLBACK;
+    END update_job_record;
+
+    -- Autonomous procedure to get stale objects
+    PROCEDURE gather_stale_objects(schema_name VARCHAR2, objlist OUT dbms_stats.objecttab) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        -- Set module and action info for gather_stale_objects
+        DBMS_APPLICATION_INFO.SET_MODULE('dbx_stats_module', 'gather_stale_objects');
+        DBMS_APPLICATION_INFO.SET_ACTION('Schema: ' || schema_name);
+
+        debugging('gather_stale_objects: Gathering stale objects for schema: ' || schema_name);
+
+        DBMS_STATS.GATHER_SCHEMA_STATS(ownname => schema_name, options => 'LIST STALE', objlist => objlist);
+
+        -- Clear module and action info
+        DBMS_APPLICATION_INFO.SET_MODULE(NULL, NULL);
+        DBMS_APPLICATION_INFO.SET_ACTION(NULL);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in gather_stale_objects: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END gather_stale_objects;
+
+    -- Autonomous procedure to get empty objects
+    PROCEDURE gather_empty_objects(schema_name VARCHAR2, objlist OUT dbms_stats.objecttab) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        -- Set module and action info for gather_empty_objects
+        DBMS_APPLICATION_INFO.SET_MODULE('dbx_stats_module', 'gather_empty_objects');
+        DBMS_APPLICATION_INFO.SET_ACTION('Schema: ' || schema_name);
+
+        debugging('gather_empty_objects: Gathering empty objects for schema: ' || schema_name);
+
+        DBMS_STATS.GATHER_SCHEMA_STATS(ownname => schema_name, options => 'LIST EMPTY', objlist => objlist);
+
+        -- Clear module and action info
+        DBMS_APPLICATION_INFO.SET_MODULE(NULL, NULL);
+        DBMS_APPLICATION_INFO.SET_ACTION(NULL);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in gather_empty_objects: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END gather_empty_objects;
+
+    -- Autonomous procedure to drop a job
+    PROCEDURE drop_job(p_job_name VARCHAR2) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        DBMS_SCHEDULER.DROP_JOB(p_job_name);
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in drop_job: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+            ROLLBACK;
+    END drop_job;
+
+    -- Autonomous procedure to purge scheduler logs
+    PROCEDURE purge_log(p_job_name VARCHAR2) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    BEGIN
+        DBMS_SCHEDULER.PURGE_LOG(job_name => p_job_name);
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in purge_log: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+            ROLLBACK;
+    END purge_log;
+
+    FUNCTION get_prefs_schema_tbls(v_schema_to_check VARCHAR2)
+        RETURN dbx_pref_table PIPELINED
+    IS
+        v_regexp VARCHAR2(128);
+        v_quoted_object_name VARCHAR2(258); -- Adjusted to accommodate quotes and object name length
+        CURSOR schema_cursor IS
+            SELECT username
+            FROM dba_users
+            WHERE oracle_maintained = 'N'
+              AND (v_schema_to_check = '__ALL__' OR
+                   (v_schema_to_check LIKE '__REGEXP__%' AND REGEXP_LIKE(LOWER(username), v_regexp)) OR
+                   LOWER(username) = LOWER(v_schema_to_check));
+        pref_value VARCHAR2(4000);
+
+        CURSOR pref_cursor IS
+            SELECT pname
+            FROM dbx_stats_prefs
+            WHERE enabled = 'Y';
+
+    BEGIN
+        -- Set application info
+        DBMS_APPLICATION_INFO.SET_CLIENT_INFO('dbx_stats_client');
+        DBMS_APPLICATION_INFO.SET_MODULE('dbx_stats_module', 'get_prefs_schema_tbls');
+        DBMS_APPLICATION_INFO.SET_ACTION('Parameter: ' || v_schema_to_check);
+
+        debugging('get_prefs_schema_tbls: Parameter: ' || v_schema_to_check);
+
+        -- Extract the regular expression if provided
+        IF v_schema_to_check LIKE '__REGEXP__%' THEN
+            v_regexp := LOWER(SUBSTR(v_schema_to_check, 11));
+        END IF;
+
+        FOR schema_rec IN schema_cursor LOOP
+            -- Checking the preferences for partitioned tables
+            FOR object_rec IN (SELECT DISTINCT table_name AS object_name
+                              FROM dba_tab_partitions
+                              WHERE LOWER(table_owner) = LOWER(schema_rec.username)) LOOP
+                v_quoted_object_name := '"' || object_rec.object_name || '"';
+                FOR pref_rec IN pref_cursor LOOP
+                    BEGIN
+                        -- Set action info for preference retrieval
+                        DBMS_APPLICATION_INFO.SET_ACTION('Getting Pref: ' || pref_rec.pname || ' for ' || schema_rec.username || '.' || object_rec.object_name);
+
+                        debugging('get_prefs_schema_tbls: Getting Pref: ' || pref_rec.pname || ' for ' || schema_rec.username || '.' || object_rec.object_name);
+
+                        BEGIN
+                            pref_value := DBMS_STATS.GET_PREFS(pref_rec.pname, schema_rec.username, v_quoted_object_name);
+                        EXCEPTION
+                            WHEN NO_DATA_FOUND THEN
+                                pref_value := 'No data found';
+                        END;
+
+                        PIPE ROW(dbx_pref_record(schema_rec.username, 'TABLE', object_rec.object_name, 'Y', pref_rec.pname, pref_value));
+
+                        -- Clear action info after preference retrieval
+                        DBMS_APPLICATION_INFO.SET_ACTION(NULL);
+                    EXCEPTION
+                        WHEN OTHERS THEN
+                            IF SQLCODE = -20000 THEN
+                                PIPE ROW(dbx_pref_record(schema_rec.username, 'TABLE', object_rec.object_name, 'Y', pref_rec.pname, 'Skipped due to ORA-20000'));
+                            ELSE
+                                PIPE ROW(dbx_pref_record(schema_rec.username, 'TABLE', object_rec.object_name, 'Y', pref_rec.pname, 'Error: ' || SQLERRM));
+                            END IF;
+                            DBMS_OUTPUT.PUT_LINE('Error in get_prefs_schema_tbls (inside loop): ' || SQLERRM);
+                            IF is_trace_enabled() THEN
+                              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+                              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+                            END IF;
+                    END;
+                END LOOP;
+            END LOOP;
+
+            -- Checking the preferences for non-partitioned tables
+            FOR object_rec IN (SELECT DISTINCT table_name AS object_name
+                              FROM dba_tables
+                              WHERE LOWER(owner) = LOWER(schema_rec.username)
+                                AND partitioned = 'NO') LOOP
+                v_quoted_object_name := '"' || object_rec.object_name || '"';
+                FOR pref_rec IN pref_cursor LOOP
+                    BEGIN
+                        -- Set action info for preference retrieval
+                        DBMS_APPLICATION_INFO.SET_ACTION('Getting Pref: ' || pref_rec.pname || ' for ' || schema_rec.username || '.' || object_rec.object_name);
+
+                        debugging('get_prefs_schema_tbls: Getting Pref: ' || pref_rec.pname || ' for ' || schema_rec.username || '.' || object_rec.object_name);
+
+                        BEGIN
+                            pref_value := DBMS_STATS.GET_PREFS(pref_rec.pname, schema_rec.username, v_quoted_object_name);
+                        EXCEPTION
+                            WHEN NO_DATA_FOUND THEN
+                                pref_value := 'No data found';
+                        END;
+
+                        PIPE ROW(dbx_pref_record(schema_rec.username, 'TABLE', object_rec.object_name, 'N', pref_rec.pname, pref_value));
+
+                        -- Clear action info after preference retrieval
+                        DBMS_APPLICATION_INFO.SET_ACTION(NULL);
+                    EXCEPTION
+                        WHEN OTHERS THEN
+                            IF SQLCODE = -20000 THEN
+                                PIPE ROW(dbx_pref_record(schema_rec.username, 'TABLE', object_rec.object_name, 'N', pref_rec.pname, 'Skipped due to ORA-20000'));
+                            ELSE
+                                PIPE ROW(dbx_pref_record(schema_rec.username, 'TABLE', object_rec.object_name, 'N', pref_rec.pname, 'Error: ' || SQLERRM));
+                            END IF;
+                            DBMS_OUTPUT.PUT_LINE('Error in get_prefs_schema_tbls (inside loop): ' || SQLERRM);
+                            
+                            IF is_trace_enabled() THEN
+                              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+                              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+                            END IF;
+                    END;
+                END LOOP;
+            END LOOP;
+        END LOOP;
+
+        -- Clear application info
+        DBMS_APPLICATION_INFO.SET_MODULE(NULL, NULL);
+        DBMS_APPLICATION_INFO.SET_CLIENT_INFO(NULL);
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in get_prefs_schema_tbls: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END get_prefs_schema_tbls;
+
+    FUNCTION get_stale_stats_schema(v_schema_to_check VARCHAR2)
+        RETURN dbx_stale_stats_table PIPELINED
+    IS
+        v_regexp VARCHAR2(128);
+        mystaleobjs dbms_stats.objecttab; -- Collection to hold stale objects
+        myemptyobjs dbms_stats.objecttab; -- Collection to hold empty objects
+        v_stale_stats VARCHAR2(4000);
+        v_table_stats_status VARCHAR2(4000);
+        v_index_stats_status VARCHAR2(4000);
+        v_partitioned_status VARCHAR2(1);
+        CURSOR schema_cursor IS
+            SELECT username
+            FROM dba_users
+            WHERE oracle_maintained = 'N'
+              AND (v_schema_to_check = '__ALL__' OR
+                   (v_schema_to_check LIKE '__REGEXP__%' AND REGEXP_LIKE(LOWER(username), v_regexp)) OR
+                   LOWER(username) = LOWER(v_schema_to_check));
+
+    BEGIN
+        -- Set application info
+        DBMS_APPLICATION_INFO.SET_CLIENT_INFO('dbx_stats_client');
+        DBMS_APPLICATION_INFO.SET_MODULE('dbx_stats_module', 'get_stale_stats_schema');
+        DBMS_APPLICATION_INFO.SET_ACTION('Parameter: ' || v_schema_to_check);
+
+        debugging('get_stale_stats_schema: Parameter: ' || v_schema_to_check);
+
+        -- Extract the regular expression if provided
+        IF v_schema_to_check LIKE '__REGEXP__%' THEN
+            v_regexp := LOWER(SUBSTR(v_schema_to_check, 11));
+        END IF;
+
+        FOR schema_rec IN schema_cursor LOOP
+            -- Initialize the collections
+            mystaleobjs := dbms_stats.objecttab();
+            myemptyobjs := dbms_stats.objecttab();
+
+            -- Set action for gathering stale objects
+            DBMS_APPLICATION_INFO.SET_ACTION('Gathering Stale Objects for Schema: ' || schema_rec.username);
+            gather_stale_objects(schema_rec.username, mystaleobjs);
+
+            -- Set action for gathering empty objects
+            DBMS_APPLICATION_INFO.SET_ACTION('Gathering Empty Objects for Schema: ' || schema_rec.username);
+            gather_empty_objects(schema_rec.username, myemptyobjs);
+
+            -- Process the collection of stale objects
+            FOR i IN 1..mystaleobjs.COUNT LOOP
+                -- Determine if the object is partitioned
+                IF mystaleobjs(i).objtype = 'TABLE' THEN
+                    BEGIN
+                        SELECT CASE WHEN partitioned = 'YES' THEN 'Y' ELSE 'N' END
+                        INTO v_partitioned_status
+                        FROM dba_tables
+                        WHERE owner = schema_rec.username
+                          AND table_name = mystaleobjs(i).objname;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            v_partitioned_status := 'N'; -- Default to 'N' if not found
+                    END;
+                ELSIF mystaleobjs(i).objtype = 'INDEX' THEN
+                    BEGIN
+                        SELECT CASE WHEN partitioned = 'YES' THEN 'Y' ELSE 'N' END
+                        INTO v_partitioned_status
+                        FROM dba_indexes
+                        WHERE owner = schema_rec.username
+                          AND index_name = mystaleobjs(i).objname;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            v_partitioned_status := 'N'; -- Default to 'N' if not found
+                    END;
+                ELSE
+                    v_partitioned_status := 'N'; -- Default to 'N' if type is not TABLE or INDEX
+                END IF;
+
+                PIPE ROW(dbx_stale_stats_record(
+                    schema_rec.username,
+                    mystaleobjs(i).objtype,
+                    mystaleobjs(i).objname,
+                    v_partitioned_status,
+                    mystaleobjs(i).partname,
+                    'DBMS_STATS-STALE'
+                ));
+            END LOOP;
+
+            -- Process the collection of empty objects
+            FOR i IN 1..myemptyobjs.COUNT LOOP
+                -- Determine if the object is partitioned
+                IF myemptyobjs(i).objtype = 'TABLE' THEN
+                    BEGIN
+                        SELECT CASE WHEN partitioned = 'YES' THEN 'Y' ELSE 'N' END
+                        INTO v_partitioned_status
+                        FROM dba_tables
+                        WHERE owner = schema_rec.username
+                          AND table_name = myemptyobjs(i).objname;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            v_partitioned_status := 'N'; -- Default to 'N' if not found
+                    END;
+                ELSIF myemptyobjs(i).objtype = 'INDEX' THEN
+                    BEGIN
+                        SELECT CASE WHEN partitioned = 'YES' THEN 'Y' ELSE 'N' END
+                        INTO v_partitioned_status
+                        FROM dba_indexes
+                        WHERE owner = schema_rec.username
+                          AND index_name = myemptyobjs(i).objname;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            v_partitioned_status := 'N'; -- Default to 'N' if not found
+                    END;
+                ELSE
+                    v_partitioned_status := 'N'; -- Default to 'N' if type is not TABLE or INDEX
+                END IF;
+
+                PIPE ROW(dbx_stale_stats_record(
+                    schema_rec.username,
+                    myemptyobjs(i).objtype,
+                    myemptyobjs(i).objname,
+                    v_partitioned_status,
+                    myemptyobjs(i).partname,
+                    'DBMS_STATS-EMPTY'
+                ));
+            END LOOP;
+
+            -- Check table statistics status
+            FOR table_stat_rec IN (
+                SELECT ts.table_name, ts.stale_stats, t.partitioned
+                FROM dba_tab_statistics ts
+                JOIN dba_tables t ON ts.owner = t.owner AND ts.table_name = t.table_name
+                WHERE ts.owner = schema_rec.username
+            ) LOOP
+                IF table_stat_rec.stale_stats = 'YES' THEN
+                    PIPE ROW(dbx_stale_stats_record(
+                        schema_rec.username,
+                        'TABLE',
+                        table_stat_rec.table_name,
+                        CASE WHEN table_stat_rec.partitioned = 'YES' THEN 'Y' ELSE 'N' END,
+                        NULL,
+                        'DBA_TAB_STATISTICS'
+                    ));
+                END IF;
+            END LOOP;
+
+            -- Check index statistics status
+            FOR index_stat_rec IN (
+                SELECT dis.index_name, dis.stale_stats, i.partitioned
+                FROM dba_ind_statistics dis
+                JOIN dba_indexes i ON dis.owner = i.owner AND dis.index_name = i.index_name
+                WHERE dis.owner = schema_rec.username
+            ) LOOP
+                IF index_stat_rec.stale_stats = 'YES' THEN
+                    PIPE ROW(dbx_stale_stats_record(
+                        schema_rec.username,
+                        'INDEX',
+                        index_stat_rec.index_name,
+                        CASE WHEN index_stat_rec.partitioned = 'YES' THEN 'Y' ELSE 'N' END,
+                        NULL,
+                        'DBA_IND_STATISTICS'
+                    ));
+                END IF;
+            END LOOP;
+        END LOOP;
+
+        -- Clear application info
+        DBMS_APPLICATION_INFO.SET_MODULE(NULL, NULL);
+        DBMS_APPLICATION_INFO.SET_CLIENT_INFO(NULL);
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in get_stale_stats_schema: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END get_stale_stats_schema;
+
+    PROCEDURE set_prefs(
+        p_schema_name  IN VARCHAR2,
+        p_table_name   IN VARCHAR2 DEFAULT NULL,
+        p_pname        IN VARCHAR2,
+        p_value        IN VARCHAR2
+    ) IS
+        v_regexp VARCHAR2(128);
+        v_partitioned_status VARCHAR2(1);
+        v_pref_count NUMBER;
+        v_quoted_object_name VARCHAR2(258);
+        TYPE table_rec_type IS RECORD (
+            table_name VARCHAR2(128),
+            partitioned VARCHAR2(3)
+        );
+        TYPE table_list IS TABLE OF table_rec_type;
+        v_table_list table_list;
+        CURSOR schema_cursor IS
+            SELECT username
+            FROM dba_users
+            WHERE oracle_maintained = 'N'
+              AND (p_schema_name = '__ALL__' OR
+                   (p_schema_name LIKE '__REGEXP__%' AND REGEXP_LIKE(LOWER(username), v_regexp)) OR
+                   LOWER(username) = LOWER(p_schema_name));
+        CURSOR table_cursor(schema_name VARCHAR2) IS
+            SELECT table_name, partitioned
+            FROM dba_tables
+            WHERE owner = schema_name;
+    BEGIN
+        -- Check if p_pname exists in dbx_stats_prefs
+        SELECT COUNT(*)
+        INTO v_pref_count
+        FROM dbx_stats_prefs
+        WHERE pname = p_pname;
+
+        IF v_pref_count = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Preference name ' || p_pname || ' does not exist in dbx_stats_prefs');
+        END IF;
+
+        -- Set application info
+        DBMS_APPLICATION_INFO.SET_CLIENT_INFO('dbx_stats_client');
+        DBMS_APPLICATION_INFO.SET_MODULE('dbx_stats_module', 'set_prefs');
+        DBMS_APPLICATION_INFO.SET_ACTION('Parameter: ' || p_schema_name || ', ' || NVL(p_table_name, 'Schema level'));
+
+        debugging('set_prefs: Parameter: ' || p_schema_name || ', Table: ' || NVL(p_table_name, 'Schema level'));
+
+        -- Extract the regular expression if provided
+        IF p_schema_name LIKE '__REGEXP__%' THEN
+            v_regexp := LOWER(SUBSTR(p_schema_name, 11));
+        END IF;
+
+        FOR schema_rec IN schema_cursor LOOP
+            IF p_table_name IS NULL THEN
+                OPEN table_cursor(schema_rec.username);
+                FETCH table_cursor BULK COLLECT INTO v_table_list;
+                CLOSE table_cursor;
+                FOR i IN 1..v_table_list.COUNT LOOP
+                    v_quoted_object_name := '"' || v_table_list(i).table_name || '"';
+                    IF p_pname = 'INCREMENTAL' THEN
+                        IF v_table_list(i).partitioned = 'YES' THEN
+                            -- Set preference at the table level for partitioned table
+                            DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                        END IF;
+                    ELSE
+                        -- Set preference at the table level
+                        DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                    END IF;
+                END LOOP;
+            ELSE
+                -- Determine if the table is partitioned if pname is 'INCREMENTAL'
+                v_quoted_object_name := '"' || p_table_name || '"';
+                IF p_pname = 'INCREMENTAL' THEN
+                    BEGIN
+                        SELECT CASE WHEN partitioned = 'YES' THEN 'Y' ELSE 'N' END
+                        INTO v_partitioned_status
+                        FROM dba_tables
+                        WHERE owner = schema_rec.username
+                          AND table_name = p_table_name;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            v_partitioned_status := 'N'; -- Default to 'N' if not found
+                    END;
+
+                    IF v_partitioned_status = 'Y' THEN
+                        -- Set preference at the table level for partitioned table
+                        DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                    END IF;
+                ELSE
+                    -- Set preference at the table level
+                    DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                END IF;
+            END IF;
+        END LOOP;
+
+        -- Clear application info
+        DBMS_APPLICATION_INFO.SET_MODULE(NULL, NULL);
+        DBMS_APPLICATION_INFO.SET_CLIENT_INFO(NULL);
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in set_prefs: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END set_prefs;
+
+    FUNCTION gather_schema_stats(
+        p_schema_name IN VARCHAR2,
+        p_degree      IN INTEGER,
+        p_cluster     IN VARCHAR2 DEFAULT 'FALSE'
+    ) RETURN dbx_job_table PIPELINED IS
+        v_cluster BOOLEAN;
+        v_regexp VARCHAR2(128);
+        v_instance_number NUMBER;
+        v_instance_count NUMBER;
+        v_job_name VARCHAR2(128);
+        v_current_parallel_jobs NUMBER := 0;
+        v_max_parallel_jobs NUMBER := p_degree;
+        v_start_time TIMESTAMP;
+        v_end_time TIMESTAMP;
+        v_duration INTERVAL DAY TO SECOND;
+        v_job_status dbx_job_table := dbx_job_table(); -- Collection to hold job records
+        v_all_jobs NUMBER := 0;
+        v_running_jobs NUMBER := 0;
+        v_node_id NUMBER;
+        v_session_id VARCHAR2(30);
+        v_job_state VARCHAR2(30);
+        v_log_id NUMBER;
+        v_status VARCHAR2(30);
+        v_error NUMBER;
+        v_info VARCHAR2(4000);
+        v_max_runtime NUMBER;
+        v_max_job_runtime NUMBER;
+        v_job_auto_drop VARCHAR2(5);
+        v_job_purge_log VARCHAR2(5);
+
+        CURSOR schema_cursor IS
+            SELECT username
+            FROM dba_users
+            WHERE oracle_maintained = 'N'
+              AND (p_schema_name = '__ALL__' OR
+                   (p_schema_name LIKE '__REGEXP__%' AND REGEXP_LIKE(LOWER(username), v_regexp)) OR
+                   LOWER(username) = LOWER(p_schema_name));
+
+    BEGIN
+
+        v_start_time := SYSTIMESTAMP;
+
+        -- Determine if clustering is enabled
+        v_cluster := (p_cluster = 'TRUE');
+
+        -- Extract the regular expression if provided
+        IF p_schema_name LIKE '__REGEXP__%' THEN
+            v_regexp := LOWER(SUBSTR(p_schema_name, 11));
+        END IF;
+
+        -- Determine instance number if cluster option is enabled
+        IF v_cluster THEN
+            SELECT instance_number
+            INTO v_instance_number
+            FROM v$instance;
+        END IF;
+
+        -- Determine the number of instances if cluster option is enabled
+        IF v_cluster THEN
+            SELECT COUNT(*)
+            INTO v_instance_count
+            FROM gv$instance;
+        END IF;
+
+        -- Get max_runtime setting
+        v_max_runtime := TO_NUMBER(dbx_stats_manager('max_runtime').get_setting);
+        v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_runtime').get_setting);
+        v_job_auto_drop := dbx_stats_manager('job_auto_drop').get_setting;
+        v_job_purge_log := dbx_stats_manager('job_purge_log').get_setting;
+
+        FOR schema_rec IN schema_cursor LOOP
+            v_all_jobs := v_all_jobs + 1;
+        END LOOP;
+
+        FOR schema_rec IN schema_cursor LOOP
+            v_job_name := LOWER('dbx_stats_gather_schema_stats_' || schema_rec.username || '_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MISS'));
+
+            IF v_cluster THEN
+                -- Assign instance number for job
+                v_node_id := MOD(v_all_jobs, v_instance_count) + 1;
+            END IF;
+
+            -- Log job start time
+            v_start_time := SYSTIMESTAMP;
+
+            debugging('gather_schema_stats: Submitting job for schema: ' || schema_rec.username || ', Job name: ' || v_job_name);
+
+            -- Insert initial job record
+            debugging('Insert initial job record');
+            insert_job_record(schema_rec.username, v_job_name, v_instance_number, v_session_id);
+
+            -- Create and run the job
+            create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime);
+
+            -- Retrieve current session ID
+            SELECT SYS_CONTEXT('USERENV', 'SID')
+            INTO v_session_id
+            FROM dual;
+
+            -- Update job status to RUNNING
+            debugging('update job status to RUNNING for job: '|| v_job_name);
+            update_job_record(v_job_name, 'RUNNING');
+
+            -- Wait for the job to complete
+            LOOP
+                -- Check the number of currently running jobs
+                SELECT COUNT(*)
+                INTO v_current_parallel_jobs
+                FROM gv$session
+                WHERE program = 'dbx_stats_client';
+                debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
+
+                EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
+
+                -- Wait for a job to complete if the degree is reached
+                DBMS_LOCK.SLEEP(10);
+
+                -- Check if max_runtime is exceeded
+                IF (SYSTIMESTAMP - v_start_time) * 24 * 60 > v_max_runtime THEN
+                    debugging('Max runtime exceeded, stopping job: ' || v_job_name);
+
+                    -- Collect job details from DBMS_SCHEDULER logs
+                    SELECT log_id, status, error#, additional_info
+                    INTO v_log_id, v_status, v_error, v_info
+                    FROM dba_scheduler_job_run_details
+                    WHERE lower(job_name) = v_job_name
+                    ORDER BY log_date DESC
+                    FETCH FIRST ROW ONLY;
+
+                    -- Update job record to STOPPED with additional details
+                    debugging('updating job record to STOPPED');
+                    update_job_record(v_job_name, 'STOPPED', v_duration, v_status, v_error, v_info);
+
+                    EXIT;
+                END IF;
+            END LOOP;
+
+            debugging('EXIT LOOP');
+
+            -- Log job end time and duration
+            v_end_time := SYSTIMESTAMP;
+            v_duration := v_end_time - v_start_time;
+
+            DBMS_LOCK.SLEEP(10);
+            -- Collect job details from DBMS_SCHEDULER logs
+            SELECT log_id, status, error#, additional_info
+            INTO v_log_id, v_status, v_error, v_info
+            FROM dba_scheduler_job_run_details
+            WHERE lower(job_name) = v_job_name
+            ORDER BY log_date DESC
+            FETCH FIRST ROW ONLY;
+
+            -- Update job record to COMPLETED with additional details
+            debugging('updating job record');
+            update_job_record(v_job_name, 'COMPLETED', v_duration, v_status, v_error, v_info);
+
+            -- Drop the job and purge its logs if settings are enabled
+            IF v_job_auto_drop = 'true' THEN
+                debugging('Dropping job: ' || v_job_name);
+                drop_job(v_job_name);
+            END IF;
+
+            IF v_job_purge_log = 'true' THEN
+                debugging('Purging log for job: ' || v_job_name);
+                purge_log(v_job_name);
+            END IF;
+
+            debugging('gather_schema_stats: Job completed for schema: ' || schema_rec.username || ', Job name: ' || v_job_name || ', Duration: ' || TO_CHAR(v_duration, 'HH24:MI:SS'));
+        END LOOP;
+
+        -- Log overall duration and number of schemas processed
+        v_end_time := SYSTIMESTAMP;
+        v_duration := v_end_time - v_start_time;
+
+        DBMS_OUTPUT.PUT_LINE('Overall Duration: ' || TO_CHAR(v_duration, 'HH24:MI:SS'));
+        DBMS_OUTPUT.PUT_LINE('Total Schemas Processed: ' || v_all_jobs);
+
+        -- Return job status from the log table
+        FOR rec IN (SELECT schema_name, job_name, job_status, start_time, duration, instance_number, dbms_scheduler_status, dbms_scheduler_error, dbms_scheduler_info, session_id FROM dbx_job_record_log WHERE session_id = v_session_id) LOOP
+            v_job_status.EXTEND;
+            v_job_status(v_job_status.COUNT) := dbx_job_record(
+                rec.schema_name,
+                rec.job_name,
+                rec.job_status,
+                rec.start_time,
+                rec.duration,
+                rec.instance_number,
+                rec.dbms_scheduler_status,
+                rec.dbms_scheduler_error,
+                rec.dbms_scheduler_info,
+                rec.session_id
+            );
+            PIPE ROW(v_job_status(v_job_status.COUNT));
+        END LOOP;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in gather_schema_stats: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END gather_schema_stats;
+
+    FUNCTION get_job_status RETURN dbx_job_table PIPELINED IS
+        v_job_record dbx_job_record;
+    BEGIN
+        -- Retrieve job status from the log table
+        FOR rec IN (SELECT schema_name, job_name, job_status, start_time, duration, instance_number, dbms_scheduler_status, dbms_scheduler_error, dbms_scheduler_info, session_id FROM dbx_job_record_log) LOOP
+            v_job_record := dbx_job_record(
+                rec.schema_name,
+                rec.job_name,
+                rec.job_status,
+                rec.start_time,
+                rec.duration,
+                rec.instance_number,
+                rec.dbms_scheduler_status,
+                rec.dbms_scheduler_error,
+                rec.dbms_scheduler_info,
+                rec.session_id
+            );
+            PIPE ROW(v_job_record);
+        END LOOP;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in get_job_status: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END get_job_status;
+
+    -- Procedure to clean up job logs based on retention setting
+    PROCEDURE clean_up_job_logs IS
+        v_retention NUMBER;
+    BEGIN
+        -- Get retention period from settings
+        SELECT TO_NUMBER(setting_value) INTO v_retention
+        FROM dbx_stats_settings
+        WHERE LOWER(setting_name) = 'job_log_retention';
+
+        -- Delete old job logs
+        DELETE FROM dbx_job_record_log
+        WHERE start_time < SYSTIMESTAMP - INTERVAL '1' DAY * v_retention;
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in clean_up_job_logs: ' || SQLERRM);
+            IF is_trace_enabled() THEN
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+            END IF;
+    END clean_up_job_logs;
+
+END dbx_stats;
+/
+

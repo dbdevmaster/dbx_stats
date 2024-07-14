@@ -1,0 +1,30 @@
+{
+  "name": "dbx_stats",
+  "version": "1.0.1",
+  "description": "The `dbx_stats` package is designed to facilitate the management of Oracle database statistics, making it highly beneficial for database administrators.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "release": "standard-version"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dbdevmaster/dbx_stats.git"
+  },
+  "keywords": [
+    "plsql",
+    "oracle",
+    "database",
+    "statistics",
+    "dbx_stats"
+  ],
+  "author": "dbdevmaster <97837250+dbdevmaster@users.noreply.github.com>",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/dbdevmaster/dbx_stats/issues"
+  },
+  "homepage": "https://github.com/dbdevmaster/dbx_stats#readme",
+  "devDependencies": {
+    "standard-version": "^9.3.2"
+  }
+}
