@@ -1,6 +1,6 @@
 {
   "name": "dbx_stats",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "The `dbx_stats` package is designed to facilitate the management of Oracle database statistics, making it highly beneficial for database administrators.",
   "main": "index.js",
   "scripts": {
