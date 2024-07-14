@@ -1,7 +1,4 @@
 # dbx_stats
-<<<<<<< HEAD
-The `dbx_stats` package is designed to facilitate the management of Oracle database statistics, making it highly beneficial for database administrators.
-=======
 
 ## Key Features
 
@@ -300,4 +297,3 @@ WHERE
 - [Gathering Optimizer Statistics](https://docs.oracle.com/en/database/oracle/oracle-database/19/tgsql/gathering-optimizer-statistics.html#GUID-C4F0B12B-2C9E-4050-B647-F7DC451D7878)
 - [FAQ: Automatic Statistics Collection (Doc ID 1233203.1)](https://support.oracle.com/epmos/faces/DocumentDisplay?id=1233203.1)
 - [How to List the Objects with Stale Statistics Using dbms_stats.gather_schema_stats options=>'LIST STALE' (Doc ID 457666.1)](https://support.oracle.com/epmos/faces/DocumentDisplay?id=457666.1)
->>>>>>> dad666c (Initial commit)
