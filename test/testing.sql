@@ -24,7 +24,7 @@ select * from DBX_STATS_SETTINGS;
 SELECT * FROM TABLE(dbx_stats.get_job_status);
 select 'exec dbms_scheduler.drop_job('''||job_name||''');' from user_scheduler_jobs where job_name like 'DBX%';
 select * from dba_scheduler_job_run_details where lower(job_name) = lower('dbx_stats_gather_schema_stats_admin_20240713_190411');
-                exec DBMS_SCHEDULER.PURGE_LOG(job_name => 'dbx_stats_gather_schema_stats_admin_20240713_190411');
+              exec DBMS_SCHEDULER.PURGE_LOG(job_name => 'dbx_stats_gather_schema_stats_admin_20240713_190411');
 
 
 
