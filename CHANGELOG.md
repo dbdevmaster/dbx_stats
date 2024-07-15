@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.1.0...v1.1.1) (2024-07-15)
+
+
+### Bug Fixes
+
+* PLS-00363: expression 'DBX_STATS_MANAGER(<null>, TO_CHAR(SQLDEVBIND1Z_2))' cannot be used as an assignment target ([97ba238](https://github.com/dbdevmaster/dbx_stats/commit/97ba23883d8abc1d52697c1822fe57d906d04674))
+
 ## [1.1.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.0.2...v1.1.0) (2024-07-15)
 
 
