@@ -848,31 +848,55 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             END IF;
     END clean_up_job_logs;
 
-    PROCEDURE watch_jobs(v_g_session_id VARCHAR2) IS
-      v_max_runtime        NUMBER;
-      v_max_job_runtime    NUMBER;
-      v_duration           INTERVAL DAY TO SECOND;
-      v_status             VARCHAR2(30);
-      v_error              NUMBER;
-      v_info               VARCHAR2(4000);
-      v_log_id             NUMBER;
-      v_last_log_id        NUMBER;
-      v_current_status     VARCHAR2(30);
-      v_job_completed      BOOLEAN := TRUE;
-      v_job_status         VARCHAR2(30);
-  BEGIN
+      PROCEDURE watch_jobs(v_g_session_id VARCHAR2) IS
+        v_max_runtime        NUMBER;
+        v_max_job_runtime    NUMBER;
+        v_duration           INTERVAL DAY TO SECOND;
+        v_status             VARCHAR2(30);
+        v_error              NUMBER;
+        v_info               VARCHAR2(4000);
+        v_current_status     VARCHAR2(30);
+        v_job_completed      BOOLEAN := TRUE;
+        v_job_status         VARCHAR2(30);
+      BEGIN
       v_max_runtime := TO_NUMBER(dbx_stats_manager('max_runtime').get_setting) * 60; -- Convert hours to minutes
-      --v_max_runtime := 1; -- testing
+      -- v_max_runtime := 1; -- testing
       v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_runtime').get_setting) * 60 + 1; -- Convert hours to minutes and add a few ticks
-      --v_max_job_runtime := 2; --testing
+      -- v_max_job_runtime := 2; -- testing
   
       LOOP
           v_job_completed := TRUE;
   
           FOR rec IN (
-              SELECT schema_name, job_name, start_time, job_status
-              FROM dbx_job_record_log
-              WHERE job_status NOT IN ('COMPLETED', 'STOPPED') AND g_session_id = v_g_session_id
+              SELECT 
+                  jrl.schema_name, 
+                  jrl.job_name, 
+                  jrl.start_time, 
+                  jrl.job_status, 
+                  rsj.status, 
+                  rsj.log_id,
+                  rsj.error#, 
+                  rsj.additional_info,
+                  CASE 
+                      WHEN drj.job_name IS NOT NULL THEN 'RUNNING'
+                      ELSE 'NOT RUNNING'
+                  END AS current_status
+              FROM 
+                  dbx_job_record_log jrl
+              LEFT JOIN 
+                  dba_scheduler_running_jobs drj 
+                  ON lower(jrl.job_name) = lower(drj.job_name)
+              LEFT JOIN 
+                  dba_scheduler_job_run_details rsj 
+                  ON lower(jrl.job_name) = lower(rsj.job_name) 
+                  AND rsj.log_id IN (
+                      SELECT max(log_id) 
+                      FROM dba_scheduler_job_run_details 
+                      WHERE lower(job_name) = lower(jrl.job_name)
+                  )
+              WHERE 
+                  jrl.job_status NOT IN ('COMPLETED', 'STOPPED') 
+                  AND jrl.g_session_id = v_g_session_id
           ) LOOP
               v_job_completed := FALSE;
               v_job_status := rec.job_status;
@@ -883,7 +907,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                   -- Update job record to STOPPED with additional details
                   v_duration := SYSTIMESTAMP - rec.start_time;
                   v_job_status := 'STOPPED';
-                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, v_status, v_error, v_info);
+                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
               END IF;
   
               -- Check if individual job max_job_runtime is exceeded
@@ -892,24 +916,15 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                   -- Update job record to STOPPED with additional details
                   v_duration := SYSTIMESTAMP - rec.start_time;
                   v_job_status := 'STOPPED';
-                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, v_status, v_error, v_info);
+                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
               END IF;
   
               DBMS_SESSION.SLEEP(10);
               -- Check if job is not running anymore and update the log table
-              SELECT MAX(log_id)
-              INTO v_last_log_id
-              FROM dba_scheduler_job_run_details
-              WHERE lower(job_name) = lower(rec.job_name);
-  
-              SELECT status, error#, additional_info
-              INTO v_current_status, v_error, v_info
-              FROM dba_scheduler_job_run_details
-              WHERE log_id = v_last_log_id;
-  
-              IF v_current_status IN ('COMPLETED', 'STOPPED', 'FAILED', 'BROKEN') THEN
+              IF rec.current_status = 'NOT RUNNING' THEN
                   v_duration := SYSTIMESTAMP - rec.start_time;
-                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, v_current_status, v_error, v_info);
+                  v_job_status := 'COMPLETED';
+                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
               END IF;
           END LOOP;
   
@@ -929,6 +944,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
               DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
           END IF;
   END watch_jobs;
+
 
 END dbx_stats;
 /
