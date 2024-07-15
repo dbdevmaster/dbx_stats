@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.1.1...v1.1.2) (2024-07-15)
+
+
+### Bug Fixes
+
+* job_name not longer then 32 characters ([196f93c](https://github.com/dbdevmaster/dbx_stats/commit/196f93c7e2d6f7d0d010c8802ba4244f806e712d))
+
 ### [1.1.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.1.0...v1.1.1) (2024-07-15)
 
 
