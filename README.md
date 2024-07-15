@@ -34,6 +34,14 @@ The `gather_schema_stats` function allows you to gather schema statistics in par
 - **dbx_prefs_manager**: Manages preferences used by the `dbx_stats` package.
 - **dbx_stats_manager**: Manages various settings used by the `dbx_stats` package.
 
+## Installation
+
+### Database user permissions
+```sql
+grant create job to <username>;
+grant manage schedule to <username>;
+```
+
 
 ### set_prefs
 Sets preferences for a specific schema and table.
