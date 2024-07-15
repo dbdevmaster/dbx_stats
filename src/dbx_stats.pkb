@@ -721,7 +721,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 FROM gv$session
                 WHERE client_info = 'dbx_stats_client'
                 AND module = 'dbx_stats_module'
-                AND action LIKE 'Schmea:%';
+                AND action LIKE 'Schema:%';
 
                 debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
 
