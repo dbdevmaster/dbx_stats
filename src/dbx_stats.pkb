@@ -52,6 +52,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                 END;',
             start_date      => SYSTIMESTAMP + INTERVAL '10' SECOND,
             enabled         => TRUE,
+            end_date        => null,
             auto_drop       => TRUE,
             comments        => 'Watcher job to monitor and manage gather schema stats jobs'
         );
@@ -82,7 +83,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                 DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
                                 END;',
             start_date      => SYSTIMESTAMP,
-            end_date        => SYSTIMESTAMP + INTERVAL '1' MINUTE * p_max_job_runtime,
+            end_date        => null,
             enabled         => TRUE,
             comments        => 'Gather stats for schema ' || p_schema_name,
             auto_drop       => FALSE
@@ -737,6 +738,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             update_job_record(v_job_name, 'RUNNING');
         END LOOP;
 
+        -- sleep
+        DBMS_SESSION.SLEEP(10);
         -- Wait for all jobs to complete
         LOOP
             v_running_jobs := 0;
@@ -857,13 +860,13 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         v_job_completed := TRUE;
 
         FOR rec IN (
-            SELECT schema_name, job_name, start_time
+            SELECT schema_name, job_name, start_time, job_status
             FROM dbx_job_record_log
             WHERE job_status NOT IN ('COMPLETED', 'STOPPED')
         ) LOOP
             v_job_completed := FALSE;
             -- Check if overall max_runtime is exceeded
-            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_runtime THEN
+            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > 2 THEN
                 DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
                 -- Update job record to STOPPED with additional details
                 v_duration := SYSTIMESTAMP - rec.start_time;
@@ -871,7 +874,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             END IF;
 
             -- Check if individual job max_job_runtime is exceeded
-            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_job_runtime THEN
+            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > 1 THEN
                 DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
                 -- Update job record to STOPPED with additional details
                 v_duration := SYSTIMESTAMP - rec.start_time;
@@ -891,7 +894,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             IF v_current_status IN ('COMPLETED', 'STOPPED', 'FAILED', 'BROKEN') THEN
                 v_duration := SYSTIMESTAMP - rec.start_time;
-                update_job_record(rec.job_name, v_current_status, v_duration, v_current_status, v_error, v_info);
+                update_job_record(rec.job_name, rec.job_status , v_duration, v_current_status, v_error, v_info);
             END IF;
         END LOOP;
 
@@ -914,4 +917,3 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
 END dbx_stats;
 /
-
