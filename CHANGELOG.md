@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.2.1...v1.3.0) (2024-07-15)
+
+
+### Features
+
+* add uniq session identifier ([d1a3d5d](https://github.com/dbdevmaster/dbx_stats/commit/d1a3d5d79f8706f6f779b93a101c4a4cf107f1d7))
+
+
+### Bug Fixes
+
+* exit condition ([9596f56](https://github.com/dbdevmaster/dbx_stats/commit/9596f56b4ec7f4b2f4a987767e986b92fd719807))
+
 ### [1.2.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.2.0...v1.2.1) (2024-07-15)
 
 
