@@ -617,7 +617,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         v_regexp VARCHAR2(128);
         v_instance_number NUMBER;
         v_instance_count NUMBER;
-        v_job_name VARCHAR2(128);
+        v_job_name VARCHAR2(32);
         v_current_parallel_jobs NUMBER := 0;
         v_max_parallel_jobs NUMBER := p_degree;
         v_start_time TIMESTAMP;
@@ -683,7 +683,9 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         END LOOP;
 
         FOR schema_rec IN schema_cursor LOOP
-            v_job_name := LOWER('dbx_stats_gather_schema_stats_' || schema_rec.username || '_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MISS'));
+            -- job name can be only 32 charaters long
+            --v_job_name := LOWER('dbx_stats_' || schema_rec.username || '_' || TO_CHAR(SYSDATE, 'YYYYMMDD_HH24MISS'));
+            v_job_name := SUBSTR(LOWER('dbx_stats_' || schema_rec.username ),1,32);
 
             IF v_cluster THEN
                 -- Assign instance number for job
