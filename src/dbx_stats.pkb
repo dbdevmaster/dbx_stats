@@ -81,6 +81,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                 DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
                                 DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || ''' || p_schema_name || ''' || '''');
                                 DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
+                                DBMS_SESSION.SLEEP(300);
                                 END;',
             start_date      => SYSTIMESTAMP,
             end_date        => null,
@@ -852,9 +853,12 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
     v_last_log_id        NUMBER;
     v_current_status     VARCHAR2(30);
     v_job_completed      BOOLEAN := TRUE;
+    v_job_status         VARCHAR2(30);
   BEGIN
     v_max_runtime := TO_NUMBER(dbx_stats_manager('max_runtime').get_setting) * 60; -- Convert hours to minutes
+    v_max_runtime := 1; -- testing
     v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_runtime').get_setting) * 60 + 1; -- Convert hours to minutes and add a few ticks
+    v_max_job_runtime := 2; --testing
 
     LOOP
         v_job_completed := TRUE;
@@ -865,27 +869,31 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             WHERE job_status NOT IN ('COMPLETED', 'STOPPED')
         ) LOOP
             v_job_completed := FALSE;
+            v_job_status := rec.job_status;
+
             -- Check if overall max_runtime is exceeded
-            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > 2 THEN
+            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_runtime THEN
                 DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
                 -- Update job record to STOPPED with additional details
                 v_duration := SYSTIMESTAMP - rec.start_time;
-                update_job_record(rec.job_name, 'STOPPED', v_duration, v_status, v_error, v_info);
+                v_job_status := 'STOPPED';
+                update_job_record(rec.job_name, v_job_status, v_duration, v_status, v_error, v_info);
             END IF;
 
             -- Check if individual job max_job_runtime is exceeded
-            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > 1 THEN
+            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_job_runtime THEN
                 DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
                 -- Update job record to STOPPED with additional details
                 v_duration := SYSTIMESTAMP - rec.start_time;
-                update_job_record(rec.job_name, 'STOPPED', v_duration, v_status, v_error, v_info);
+                v_job_status := 'STOPPED';
+                update_job_record(rec.job_name, v_job_status, v_duration, v_status, v_error, v_info);
             END IF;
 
             -- Check if job is not running anymore and update the log table
             SELECT MAX(log_id)
             INTO v_last_log_id
             FROM dba_scheduler_job_run_details
-            WHERE lower(job_name) = rec.job_name;
+            WHERE lower(job_name) = lower(rec.job_name);
 
             SELECT status, error#, additional_info
             INTO v_current_status, v_error, v_info
@@ -894,7 +902,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             IF v_current_status IN ('COMPLETED', 'STOPPED', 'FAILED', 'BROKEN') THEN
                 v_duration := SYSTIMESTAMP - rec.start_time;
-                update_job_record(rec.job_name, rec.job_status , v_duration, v_current_status, v_error, v_info);
+                update_job_record(rec.job_name, v_job_status, v_duration, v_current_status, v_error, v_info);
             END IF;
         END LOOP;
 
@@ -914,6 +922,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
         END IF;
   END watch_jobs;
+
 
 END dbx_stats;
 /
