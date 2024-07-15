@@ -719,7 +719,10 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 SELECT COUNT(*)
                 INTO v_current_parallel_jobs
                 FROM gv$session
-                WHERE program = 'dbx_stats_client';
+                WHERE client_info = 'dbx_stats_client'
+                AND module = 'dbx_stats_module'
+                AND action LIKE 'Schmea:%';
+
                 debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
 
                 EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
