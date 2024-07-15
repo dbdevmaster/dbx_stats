@@ -723,7 +723,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
 
                 -- Wait for a job to complete if the degree is reached
-                DBMS_LOCK.SLEEP(10);
+                DBMS_SESSION.SLEEP(10);
 
                 -- Check if max_runtime is exceeded
                 IF (SYSTIMESTAMP - v_start_time) * 24 * 60 > v_max_runtime THEN
@@ -751,7 +751,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             v_end_time := SYSTIMESTAMP;
             v_duration := v_end_time - v_start_time;
 
-            DBMS_LOCK.SLEEP(10);
+            DBMS_SESSION.SLEEP(10);
             -- Collect job details from DBMS_SCHEDULER logs
             SELECT log_id, status, error#, additional_info
             INTO v_log_id, v_status, v_error, v_info
