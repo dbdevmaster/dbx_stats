@@ -47,11 +47,11 @@ grant analyze any to <username>;
 ### set_prefs
 Sets preferences for a specific schema and table.
 
-- ***`p_schema_name` 
-- ***`p_table_name`: default null
-- ***`p_pname`
-- ***`p_value` 
-- ***`p_level`: default 'SCHEMA'
+- ***`p_schema_name`***
+- ***`p_table_name`***: default null
+- ***`p_pname`***
+- ***`p_value`***
+- ***`p_level`***: default 'SCHEMA'
 
 ```sql
 -- Set preferences for a specific schema and table
