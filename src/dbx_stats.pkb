@@ -742,7 +742,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Update job status to RUNNING
             debugging('update job status to RUNNING for job: '|| v_job_name);
-            update_job_record(g_session_id, v_job_name, 'RUNNING')
+            update_job_record(g_session_id, v_job_name, 'RUNNING');
 
             -- Wait for the job to complete
             LOOP
