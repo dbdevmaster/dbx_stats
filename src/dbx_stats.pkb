@@ -656,6 +656,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         v_instance_number NUMBER;
         v_instance_count NUMBER;
         v_job_name VARCHAR2(32);
+        v_current_parallel_jobs NUMBER := 0;
+        v_max_parallel_jobs NUMBER := p_degree;
         v_start_time TIMESTAMP;
         v_end_time TIMESTAMP;
         v_duration INTERVAL DAY TO SECOND;
@@ -740,7 +742,25 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Update job status to RUNNING
             debugging('update job status to RUNNING for job: '|| v_job_name);
-            update_job_record(g_session_id, v_job_name, 'RUNNING');
+            update_job_record(g_session_id, v_job_name, 'RUNNING')
+
+            -- Wait for the job to complete
+            LOOP
+                -- Check the number of currently running jobs
+                SELECT COUNT(*)
+                INTO v_current_parallel_jobs
+                FROM gv$session
+                WHERE program = 'dbx_stats_client';
+                debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
+
+                EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
+
+                -- Wait for a job to complete if the degree is reached
+                DBMS_SESSION.SLEEP(10);
+
+            END LOOP;
+
+
         END LOOP;
 
         -- sleep
@@ -858,11 +878,17 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         v_current_status     VARCHAR2(30);
         v_job_completed      BOOLEAN := TRUE;
         v_job_status         VARCHAR2(30);
+        v_auto_drop          BOOLEAN;
+        v_purge_log          BOOLEAN;
       BEGIN
       v_max_runtime := TO_NUMBER(dbx_stats_manager('max_runtime').get_setting) * 60; -- Convert hours to minutes
       -- v_max_runtime := 1; -- testing
       v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_runtime').get_setting) * 60 + 1; -- Convert hours to minutes and add a few ticks
       -- v_max_job_runtime := 2; -- testing
+
+      -- Get the settings for auto_drop and purge_log
+      v_auto_drop := (dbx_stats_manager('job_auto_drop').get_setting = 'TRUE');
+      v_purge_log := (dbx_stats_manager('job_purge_log').get_setting = 'TRUE');
   
       LOOP
           v_job_completed := TRUE;
@@ -925,6 +951,17 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                   v_duration := SYSTIMESTAMP - rec.start_time;
                   v_job_status := 'COMPLETED';
                   update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
+
+                  -- Drop the job if auto drop is enabled
+                  IF v_auto_drop THEN
+                      drop_job(rec.job_name);
+                  END IF;
+
+                  -- Purge the log if purge log is enabled
+                  IF v_purge_log THEN
+                      purge_log(rec.job_name);
+                  END IF;
+
               END IF;
           END LOOP;
   
