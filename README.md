@@ -23,6 +23,7 @@ The `dbx_stats` package offers a range of procedures and functions to set prefer
 - [Oracle Support and Documentation](#oracle-support-and-documentation)
     - [Key Documents and Links](#key-documents-and-links)
     - [Summary](#summary)
+- [Keywords](#keywords)
 
 ## Key Features
 
@@ -363,3 +364,24 @@ because of (Doc ID 411960.1) for partitioned table there will be fixed values se
 ### Summary
 
 These documents provide crucial information and guidelines for maintaining and troubleshooting statistics in Oracle databases. Ensuring up-to-date statistics is vital for database performance and efficient query execution.
+
+## Keywords
+
+- Oracle database
+- Database statistics
+- DBMS_STATS
+- Oracle DBA tools
+- Oracle performance tuning
+- Schema statistics
+- Partitioned tables
+- Non-partitioned tables
+- Oracle job management
+- Oracle debugging
+- Oracle tracing
+- Oracle session identification
+- Oracle clustering
+- Oracle parallel execution
+- Oracle preferences management
+- Oracle job status tracking
+- Oracle database optimization
+- Oracle load balancing
