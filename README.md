@@ -7,6 +7,7 @@ The `dbx_stats` package offers a range of procedures and functions to set prefer
 ## Table of Contents
 
 - [Key Features](#key-features)
+- [Package Description](#package-description)
 - [Degree and Cluster Option in gather_schema_stats](#degree-and-cluster-option-in-gather_schema_stats)
 - [Functions and Procedures](#functions-and-procedures)
     - [set_prefs](#set_prefs)
@@ -354,6 +355,10 @@ because of (Doc ID 411960.1) for partitioned table there will be fixed values se
 4. **How to List the Objects with Stale Statistics Using dbms_stats.gather_schema_stats options=>'LIST STALE'**  
    - [Doc ID: 457666.1](https://support.oracle.com/epmos/faces/DocumentDisplay?id=457666.1)  
    - Description: This document explains how to use the `LIST STALE` option with the `dbms_stats.gather_schema_stats` procedure to identify objects with stale statistics.
+
+5. **Oracle DBMS_STATS**
+    - [Oracle Documentation](https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_STATS.html)
+    - Description: With the DBMS_STATS package you can view and modify optimizer statistics gathered for database objects.
 
 ### Summary
 
