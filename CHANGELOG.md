@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.3.3...v1.4.0) (2024-07-16)
+
+
+### Features
+
+* include gather index stats in create_gather_job ([5e86706](https://github.com/dbdevmaster/dbx_stats/commit/5e86706119cc7d6a7f874e9630e92e47b26d1aef))
+
 ### [1.3.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.3.2...v1.3.3) (2024-07-16)
 
 
