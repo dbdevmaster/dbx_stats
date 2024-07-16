@@ -99,7 +99,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                       DBMS_STATS.GATHER_INDEX_STATS(
                                           ownname => ''' || p_schema_name || ''',
                                           indname => rec.index_name,
-                                          cascade => TRUE,
                                           degree  => 8
                                       );
                                   END LOOP;
