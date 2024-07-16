@@ -75,7 +75,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       p_job_name VARCHAR2, 
       p_schema_name VARCHAR2, 
       p_instance_number NUMBER, 
-      p_max_job_runtime NUMBER
+      p_max_job_runtime NUMBER,
+      p_g_session_id in VARCHAR2
   ) IS
       PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
@@ -83,20 +84,37 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           job_name        => LOWER(p_job_name),
           job_type        => 'PLSQL_BLOCK',
           job_action      => 'BEGIN 
+                                  DBMS_SESSION.SET_IDENTIFIER(''' || p_g_session_id || ''');
                                   DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
                                   DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
                                   DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || ''' || p_schema_name || ''' || '''');
                                   
                                   -- Gather schema stats
-                                  DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
+                                  --DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
   
                                   -- Gather stale index stats
                                   FOR rec IN (SELECT index_name 
                                               FROM dba_ind_statistics 
                                               WHERE owner = ''' || p_schema_name || ''' 
-                                                AND (stale_stats = ''YES'' OR stale_stats IS NULL)) 
+                                                AND stale_stats = ''YES'' )
                                   LOOP
-                                      DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || p_schema_name || '', Index: '' || rec.index_name);
+                                      DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
+                                      DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
+                                      DBMS_STATS.GATHER_INDEX_STATS(
+                                          ownname => ''' || p_schema_name || ''',
+                                          indname => rec.index_name,
+                                          degree  => 8
+                                      );
+                                  END LOOP;
+
+                                  -- Gather empty index stats
+                                  FOR rec IN (SELECT index_name 
+                                              FROM dba_ind_statistics 
+                                              WHERE owner = ''' || p_schema_name || ''' 
+                                                AND stale_stats is null)
+                                  LOOP
+                                      DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
+                                      DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
                                       DBMS_STATS.GATHER_INDEX_STATS(
                                           ownname => ''' || p_schema_name || ''',
                                           indname => rec.index_name,
@@ -619,39 +637,72 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 CLOSE table_cursor;
                 FOR i IN 1..v_table_list.COUNT LOOP
                     v_quoted_object_name := '"' || v_table_list(i).table_name || '"';
-                    IF p_pname = 'INCREMENTAL' THEN
-                        IF v_table_list(i).partitioned = 'YES' THEN
-                            -- Set preference at the table level for partitioned table
-                            DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
-                        END IF;
-                    ELSE
-                        -- Set preference at the table level
-                        DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                    debugging('set_prefs: Parameter: ' || p_schema_name || ', Table: ' || v_table_list(i).table_name ||', Parameter: '|| p_pname ||', Value: '||p_value);
+                    debugging('set_prefs: Parameter: ' || p_schema_name || ', Table: ' || v_table_list(i).table_name ||', Partitioned: '||v_table_list(i).partitioned);
+                    IF v_table_list(i).partitioned = 'YES' THEN
+                        CASE upper(p_pname)
+                            WHEN 'INCREMENTAL' THEN
+                                debugging('----------- '||p_pname||' -------------');
+                                debugging('DBMS_STATS.SET_TABLE_PREFS(ownname=>'''||schema_rec.username||''', tabname=>'''||v_quoted_object_name||''', pname=>'''||p_pname||''', pvalue=>'''||p_value||''');');
+                                DBMS_STATS.SET_TABLE_PREFS(ownname=>schema_rec.username, tabname=>v_quoted_object_name, pname=>p_pname, pvalue=>p_value);
+                                debugging('----------- '||p_pname||' -------------');
+                            WHEN 'GRANULARITY' THEN
+                                DBMS_STATS.SET_TABLE_PREFS(ownname=>schema_rec.username, tabname=>v_quoted_object_name, pname=>p_pname, pvalue=>'default');
+                            WHEN 'OPTIONS' THEN
+                                DBMS_STATS.SET_TABLE_PREFS(ownname=>schema_rec.username, tabname=>v_quoted_object_name, pname=>p_pname, pvalue=>'gather');
+                            ELSE    
+                                DBMS_STATS.SET_TABLE_PREFS(ownname=>schema_rec.username, tabname=>v_quoted_object_name, pname=>p_pname, pvalue=>p_value);
+                        END CASE;
+                    ELSE    
+                        CASE upper(p_pname)
+                            WHEN 'INCREMENTAL' THEN
+                                IF lower(p_value) = 'false'
+                                THEN
+                                    DBMS_STATS.SET_TABLE_PREFS(ownname=>schema_rec.username, tabname=>v_quoted_object_name, pname=>p_pname, pvalue=>p_value);
+                                END IF;
+                            ELSE    
+                                DBMS_STATS.SET_TABLE_PREFS(ownname=>schema_rec.username, tabname=>v_quoted_object_name, pname=>p_pname, pvalue=>p_value);
+                        END CASE;
                     END IF;
                 END LOOP;
             ELSE
                 -- Determine if the table is partitioned if pname is 'INCREMENTAL'
                 v_quoted_object_name := '"' || p_table_name || '"';
-                IF p_pname = 'INCREMENTAL' THEN
-                    BEGIN
-                        SELECT CASE WHEN partitioned = 'YES' THEN 'Y' ELSE 'N' END
-                        INTO v_partitioned_status
-                        FROM dba_tables
-                        WHERE owner = schema_rec.username
-                          AND table_name = p_table_name;
-                    EXCEPTION
-                        WHEN NO_DATA_FOUND THEN
-                            v_partitioned_status := 'N'; -- Default to 'N' if not found
-                    END;
+                BEGIN
+                    SELECT CASE WHEN partitioned = 'YES' THEN 'Y' ELSE 'N' END
+                    INTO v_partitioned_status
+                    FROM dba_tables
+                    WHERE owner = schema_rec.username
+                      AND table_name = p_table_name;
+                EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                        v_partitioned_status := 'N'; -- Default to 'N' if not found
+                END;
 
-                    IF v_partitioned_status = 'Y' THEN
-                        -- Set preference at the table level for partitioned table
-                        DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
-                    END IF;
-                ELSE
-                    -- Set preference at the table level
-                    DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                IF v_partitioned_status = 'Y' THEN
+                    -- Set preference at the table level for partitioned table
+                    CASE upper(p_pname)
+                            WHEN 'INCREMENTAL' THEN
+                                DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                            WHEN 'GRANULARITY' THEN
+                                DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, 'default');
+                            WHEN 'OPTIONS' THEN
+                                DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, 'gather');
+                            ELSE    
+                                DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                        END CASE;
+                ELSE 
+                    CASE upper(p_pname)
+                        WHEN 'INCREMENTAL' THEN
+                        IF lower(p_value) = 'flase'
+                        THEN
+                            DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                        END IF;
+                        ELSE
+                            DBMS_STATS.SET_TABLE_PREFS(schema_rec.username, v_quoted_object_name, p_pname, p_value);
+                    END CASE;
                 END IF;
+
             END IF;
         END LOOP;
 
@@ -756,7 +807,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             insert_job_record(g_session_id, schema_rec.username, v_job_name, v_instance_number, v_session_id);
 
             -- Create and run the job
-            create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime);
+            create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime, g_session_id);
 
             -- Retrieve current session ID
             SELECT SYS_CONTEXT('USERENV', 'SID')
@@ -773,7 +824,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 SELECT COUNT(*)
                 INTO v_current_parallel_jobs
                 FROM gv$session
-                WHERE program = 'dbx_stats_client';
+                WHERE program = 'dbx_stats_client'
+                AND CLIENT_IDENTIFIER = g_session_id;
                 debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
 
                 EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
@@ -795,13 +847,14 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                         FROM gv$session 
                         WHERE client_info = 'dbx_stats_client' 
                         AND module = 'dbx_stats_module' 
-                        AND action LIKE 'Schema:%') LOOP
+                        AND action LIKE 'Schema%'
+                        AND CLIENT_IDENTIFIER = g_session_id) LOOP
                 v_running_jobs := rec.running_jobs;
             END LOOP;
         
             EXIT WHEN v_running_jobs = 0;
 
-            DBMS_SESSION.SLEEP(60); -- Wait before the next check
+            DBMS_SESSION.SLEEP(20); -- Wait before the next check
         END LOOP;
 
 
@@ -976,14 +1029,14 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                   update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
 
                   -- Drop the job if auto drop is enabled
-                  IF v_auto_drop THEN
+                  --IF v_auto_drop THEN
                       drop_job(rec.job_name);
-                  END IF;
+                  --END IF;
 
                   -- Purge the log if purge log is enabled
-                  IF v_purge_log THEN
+                  --IF v_purge_log THEN
                       purge_log(rec.job_name);
-                  END IF;
+                  --END IF;
 
               END IF;
           END LOOP;
