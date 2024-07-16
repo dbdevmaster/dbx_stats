@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.3.1...v1.3.2) (2024-07-16)
+
+
+### Bug Fixes
+
+* gather_schema_stats job parallism ([09088f1](https://github.com/dbdevmaster/dbx_stats/commit/09088f1a92e52d54e08cc72f02506b451a5cd927))
+
 ### [1.3.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.3.0...v1.3.1) (2024-07-15)
 
 
