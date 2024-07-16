@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.0...v1.4.1) (2024-07-16)
+
+
+### Bug Fixes
+
+* include gather index stats in create_gather_job ([5ccf5c8](https://github.com/dbdevmaster/dbx_stats/commit/5ccf5c87842c73fa0b16d94e69d2e500c15748d1))
+* include index name in dbms_application_info action during gather_index_stats ([e526c5f](https://github.com/dbdevmaster/dbx_stats/commit/e526c5ff2695d577b95b32ce9d780995e3aee967))
+
 ## [1.4.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.3.3...v1.4.0) (2024-07-16)
 
 
