@@ -56,7 +56,7 @@ Sets preferences for a specific schema and table.
 ```sql
 -- Set preferences for a specific schema and table
 BEGIN
-    dbx_stats.set_prefs('MY_SCHEMA', 'MY_TABLE', 'DEGREE', '4', 'TABLE');
+    dbx_stats.set_prefs('MY_SCHEMA', 'MY_TABLE', 'DEGREE', '4');
 END;
 /
 ```
