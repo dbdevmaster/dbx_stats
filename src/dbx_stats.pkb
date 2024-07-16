@@ -105,7 +105,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                   END LOOP;
   
                                   -- Optional: Sleep to simulate extended processing time
-                                  DBMS_SESSION.SLEEP(300);
+                                  DBMS_SESSION.SLEEP(5);
                               END;',
           start_date      => SYSTIMESTAMP,
           end_date        => NULL,
@@ -779,7 +779,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
 
                 -- Wait for a job to complete if the degree is reached
-                DBMS_SESSION.SLEEP(10);
+                DBMS_SESSION.SLEEP(60);
 
             END LOOP;
 
@@ -787,7 +787,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         END LOOP;
 
         -- sleep
-        DBMS_SESSION.SLEEP(10);
+        DBMS_SESSION.SLEEP(2);
         -- Wait for all jobs to complete
         LOOP
             v_running_jobs := 0;
@@ -801,7 +801,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         
             EXIT WHEN v_running_jobs = 0;
 
-            DBMS_SESSION.SLEEP(10); -- Wait before the next check
+            DBMS_SESSION.SLEEP(60); -- Wait before the next check
         END LOOP;
 
 
@@ -968,7 +968,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                   update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
               END IF;
   
-              DBMS_SESSION.SLEEP(10);
+              DBMS_SESSION.SLEEP(3);
               -- Check if job is not running anymore and update the log table
               IF rec.current_status = 'NOT RUNNING' THEN
                   v_duration := SYSTIMESTAMP - rec.start_time;
