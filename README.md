@@ -1,6 +1,10 @@
 # dbx_stats
+## Package Description
 
-# Table of Contents
+The `dbx_stats` package offers a range of procedures and functions to set preferences, gather schema statistics, and retrieve stale statistics. The package also includes tools for identifying and tracking the sessions running these operations using `DBMS_APPLICATION_INFO`.
+
+
+## Table of Contents
 
 - [Key Features](#key-features)
 - [Package Description](#package-description)
@@ -32,9 +36,6 @@ The `dbx_stats` package is designed to facilitate the management of Oracle datab
 
 These features allow database administrators to ensure the accuracy and performance of their database statistics, manage the workload efficiently, and troubleshoot any issues effectively.
 
-## Package Description
-
-The `dbx_stats` package offers a range of procedures and functions to set preferences, gather schema statistics, and retrieve stale statistics. The package also includes tools for identifying and tracking the sessions running these operations using `DBMS_APPLICATION_INFO`.
 
 ## Degree and Cluster Option in gather_schema_stats
 
