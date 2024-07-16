@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.4](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.3...v1.4.4) (2024-07-16)
+
+
+### Bug Fixes
+
+* parallel degree ([7cd3de1](https://github.com/dbdevmaster/dbx_stats/commit/7cd3de17e1c5cd86c20a2f391c53375333218f48))
+
 ### [1.4.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.2...v1.4.3) (2024-07-16)
 
 
