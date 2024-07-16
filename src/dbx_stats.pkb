@@ -96,7 +96,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                               WHERE owner = ''' || p_schema_name || ''' 
                                                 AND (stale_stats = ''YES'' OR stale_stats IS NULL)) 
                                   LOOP
-                                      DBMS_APPLICATION_INFO.SET_ACTION('Schema: ' || p_schema_name || ', Index: ' || rec.index_name);
+                                      DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || p_schema_name || '', Index: '' || rec.index_name);
                                       DBMS_STATS.GATHER_INDEX_STATS(
                                           ownname => ''' || p_schema_name || ''',
                                           indname => rec.index_name,
