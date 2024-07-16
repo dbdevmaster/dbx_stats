@@ -314,9 +314,27 @@ because of (Doc ID 411960.1) for partitioned table there will be fixed values se
 - ***`GRANULARITY` -> `DEFAULT`
 - ***`OPTIONS` -> `GATHER`
 
-## Oracle Support Documents
+## Oracle Support and Documentation
 
-- STALE Column Of The DBA_IND_STATISTICS Is Not Updated When Gathered Statistics For Partitioned Tables (Doc ID 411960.1)
-- [Gathering Optimizer Statistics](https://docs.oracle.com/en/database/oracle/oracle-database/19/tgsql/gathering-optimizer-statistics.html#GUID-C4F0B12B-2C9E-4050-B647-F7DC451D7878)
-- [FAQ: Automatic Statistics Collection (Doc ID 1233203.1)](https://support.oracle.com/epmos/faces/DocumentDisplay?id=1233203.1)
-- [How to List the Objects with Stale Statistics Using dbms_stats.gather_schema_stats options=>'LIST STALE' (Doc ID 457666.1)](https://support.oracle.com/epmos/faces/DocumentDisplay?id=457666.1)
+
+### Key Documents and Links
+
+1. **STALE Column Of The DBA_IND_STATISTICS Is Not Updated When Gathered Statistics For Partitioned Tables**  
+   - [Doc ID: 411960.1](https://support.oracle.com/epmos/faces/DocumentDisplay?id=411960.1)  
+   - Description: This document addresses the issue where the STALE column in the DBA_IND_STATISTICS view is not updated correctly when statistics are gathered for partitioned tables.
+
+2. **Gathering Optimizer Statistics**  
+   - [Oracle Documentation](https://docs.oracle.com/en/database/oracle/oracle-database/19/tgsql/gathering-optimizer-statistics.html#GUID-C4F0B12B-2C9E-4050-B647-F7DC451D7878)  
+   - Description: This guide provides detailed instructions on gathering optimizer statistics, which are essential for the Oracle Database to make informed decisions about query execution plans.
+
+3. **FAQ: Automatic Statistics Collection**  
+   - [Doc ID: 1233203.1](https://support.oracle.com/epmos/faces/DocumentDisplay?id=1233203.1)  
+   - Description: A comprehensive FAQ that covers various aspects of automatic statistics collection in Oracle databases, including best practices and troubleshooting tips.
+
+4. **How to List the Objects with Stale Statistics Using dbms_stats.gather_schema_stats options=>'LIST STALE'**  
+   - [Doc ID: 457666.1](https://support.oracle.com/epmos/faces/DocumentDisplay?id=457666.1)  
+   - Description: This document explains how to use the `LIST STALE` option with the `dbms_stats.gather_schema_stats` procedure to identify objects with stale statistics.
+
+### Summary
+
+These documents provide crucial information and guidelines for maintaining and troubleshooting statistics in Oracle databases. Ensuring up-to-date statistics is vital for database performance and efficient query execution.
