@@ -1,5 +1,25 @@
 # dbx_stats
 
+# Table of Contents
+
+- [Key Features](#key-features)
+- [Package Description](#package-description)
+- [Degree and Cluster Option in gather_schema_stats](#degree-and-cluster-option-in-gather_schema_stats)
+- [Functions and Procedures](#functions-and-procedures)
+    - [set_prefs](#set_prefs)
+    - [get_prefs_schema_tbls](#get_prefs_schema_tbls)
+    - [get_stale_stats_schema](#get_stale_stats_schema)
+    - [gather_schema_stats](#gather_schema_stats)
+    - [get_job_status](#get_job_status)
+- [Analytics](#analytics)
+- [dbx_prefs_manager](#dbx_prefs_manager)
+- [dbx_stats_manager](#dbx_stats_manager)
+- [Identifying Sessions](#identifying-sessions)
+- [Known Issues](#known-issues)
+- [Oracle Support and Documentation](#oracle-support-and-documentation)
+    - [Key Documents and Links](#key-documents-and-links)
+    - [Summary](#summary)
+
 ## Key Features
 
 The `dbx_stats` package is designed to facilitate the management of Oracle database statistics, making it highly beneficial for database administrators. The key features include:
