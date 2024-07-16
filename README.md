@@ -310,9 +310,9 @@ WHERE
 ## Known Issues
 
 because of (Doc ID 411960.1) for partitioned table there will be fixed values set for pname(s):
-- ***`INCREMENTAL` -> `FALSE`
-- ***`GRANULARITY` -> `DEFAULT`
-- ***`OPTIONS` -> `GATHER`
+- ***`INCREMENTAL`*** -> `FALSE`
+- ***`GRANULARITY`*** -> `DEFAULT`
+- ***`OPTIONS`*** -> `GATHER`
 
 ## Oracle Support and Documentation
 
