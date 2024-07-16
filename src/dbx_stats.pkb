@@ -90,7 +90,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                   DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || ''' || p_schema_name || ''' || '''');
                                   
                                   -- Gather schema stats
-                                  DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
+                                  DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''', degree=> '''|| p_degree || ''');
   
                                   -- Gather stale index stats
                                   FOR rec IN (SELECT index_name 
@@ -103,7 +103,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                       DBMS_STATS.GATHER_INDEX_STATS(
                                           ownname => ''' || p_schema_name || ''',
                                           indname => rec.index_name,
-                                          degree  => 8
+                                          degree => ''' || p_degree || '''
                                       );
                                   END LOOP;
 
@@ -807,7 +807,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             insert_job_record(g_session_id, schema_rec.username, v_job_name, v_instance_number, v_session_id);
 
             -- Create and run the job
-            create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime, g_session_id);
+            create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime, g_session_id, p_degree);
 
             -- Retrieve current session ID
             SELECT SYS_CONTEXT('USERENV', 'SID')
