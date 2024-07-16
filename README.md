@@ -40,6 +40,7 @@ The `gather_schema_stats` function allows you to gather schema statistics in par
 ```sql
 grant create job to <username>;
 grant manage schedule to <username>;
+grant analyze any to <username>;
 ```
 
 
@@ -306,8 +307,16 @@ WHERE
     AND module = 'dbx_stats_module';
 ```
 
+## Known Issues
+
+because of (Doc ID 411960.1) for partitioned table there will be fixed values set for pname(s):
+- ***`INCREMENTAL` -> `FALSE`
+- ***`GRANULARITY` -> `DEFAULT`
+- ***`OPTIONS` -> `GATHER`
+
 ## Oracle Support Documents
 
+- STALE Column Of The DBA_IND_STATISTICS Is Not Updated When Gathered Statistics For Partitioned Tables (Doc ID 411960.1)
 - [Gathering Optimizer Statistics](https://docs.oracle.com/en/database/oracle/oracle-database/19/tgsql/gathering-optimizer-statistics.html#GUID-C4F0B12B-2C9E-4050-B647-F7DC451D7878)
 - [FAQ: Automatic Statistics Collection (Doc ID 1233203.1)](https://support.oracle.com/epmos/faces/DocumentDisplay?id=1233203.1)
 - [How to List the Objects with Stale Statistics Using dbms_stats.gather_schema_stats options=>'LIST STALE' (Doc ID 457666.1)](https://support.oracle.com/epmos/faces/DocumentDisplay?id=457666.1)
