@@ -46,10 +46,16 @@ grant manage schedule to <username>;
 ### set_prefs
 Sets preferences for a specific schema and table.
 
+- ***`p_schema_name` 
+- ***`p_table_name`: default null
+- ***`p_pname`
+- ***`p_value` 
+- ***`p_level`: default 'SCHEMA'
+
 ```sql
 -- Set preferences for a specific schema and table
 BEGIN
-    dbx_stats.set_prefs('MY_SCHEMA', 'MY_TABLE', 'DEGREE', '4');
+    dbx_stats.set_prefs('MY_SCHEMA', 'MY_TABLE', 'DEGREE', '4', 'TABLE');
 END;
 /
 ```
