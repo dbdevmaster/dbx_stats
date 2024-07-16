@@ -90,7 +90,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                   DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || ''' || p_schema_name || ''' || '''');
                                   
                                   -- Gather schema stats
-                                  --DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
+                                  DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''');
   
                                   -- Gather stale index stats
                                   FOR rec IN (SELECT index_name 
