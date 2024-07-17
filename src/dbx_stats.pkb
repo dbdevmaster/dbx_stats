@@ -311,7 +311,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
         -- Extract the regular expression if provided
         IF v_schema_to_check LIKE '__REGEXP__%' THEN
-            v_regexp := LOWER(SUBSTR(v_schema_to_check, 11));
+            v_regexp := LOWER(SUBSTR(v_schema_to_check, 12));
         END IF;
 
         FOR schema_rec IN schema_cursor LOOP
@@ -437,7 +437,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
         -- Extract the regular expression if provided
         IF v_schema_to_check LIKE '__REGEXP__%' THEN
-            v_regexp := LOWER(SUBSTR(v_schema_to_check, 11));
+            v_regexp := LOWER(SUBSTR(v_schema_to_check, 12));
         END IF;
 
         FOR schema_rec IN schema_cursor LOOP
