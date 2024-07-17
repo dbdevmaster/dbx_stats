@@ -103,7 +103,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                       DBMS_STATS.GATHER_INDEX_STATS(
                                           ownname => ''' || p_schema_name || ''',
                                           indname => rec.index_name,
-                                          degree => ''' || p_degree || '''
+                                          degree => 8
                                       );
                                   END LOOP;
 
@@ -134,7 +134,9 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
   
       IF p_instance_number IS NOT NULL THEN
           DBMS_SCHEDULER.SET_ATTRIBUTE(LOWER(p_job_name), 'INSTANCE_ID', p_instance_number);
+          debugging('set attribute instance_id for job_name: '||p_job_name||' to: '||p_instance_number);
       END IF;
+      DBMS_SESSION.SLEEP(1);
   
       -- Run the job immediately
       DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
@@ -795,6 +797,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             IF v_cluster THEN
                 -- Assign instance number for job
                 v_node_id := MOD(v_all_jobs, v_instance_count) + 1;
+                debugging('v_all_jobs: '|| v_all_jobs);
+                debugging('submit next job to inst_id: '|| v_node_id);
             END IF;
 
             -- Log job start time
