@@ -69,7 +69,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           ROLLBACK;
   END create_watcher_job;
 
-
     -- Autonomous procedure to create and run gather job
     PROCEDURE create_gather_job(
       p_job_name VARCHAR2, 
@@ -1065,6 +1064,114 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           END IF;
   END watch_jobs;
 
+  -- Procedure to enable automatic statistics collection
+  PROCEDURE enable(
+      p_schema_name  VARCHAR2,
+      p_degree       INTEGER,
+      p_force        BOOLEAN DEFAULT TRUE,
+      p_auto_task    BOOLEAN DEFAULT FALSE
+  ) IS
+      v_debugging_enabled BOOLEAN := is_debugging_enabled();
+      v_schedule_setting   VARCHAR2(100);
+      v_job_action         VARCHAR2(2000);
+      v_job_name           VARCHAR2(128);
+      v_schedule_name      VARCHAR2(128);
+      v_current_schema     VARCHAR2(30);
+      v_days               SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY');
+  BEGIN
+      debugging('Starting enable procedure...');
+      v_current_schema := sys_context('userenv', 'current_schema');
+  
+      -- Set auto_task
+      IF p_auto_task THEN
+          DBMS_AUTO_TASK_ADMIN.ENABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+      ELSE
+          DBMS_AUTO_TASK_ADMIN.DISABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+      END IF;
+  
+      FOR i IN 1..v_days.COUNT LOOP
+          v_schedule_name := v_current_schema || '.dbxw_' || LOWER(v_days(i));
+          v_schedule_setting := dbx_stats_manager('SCHEDULE_WINDOW_' || UPPER(v_days(i))).get_setting;
+  
+          IF p_force THEN
+              BEGIN
+                  DBMS_SCHEDULER.DROP_SCHEDULE(v_schedule_name, FORCE => TRUE);
+              EXCEPTION
+                  WHEN OTHERS THEN
+                      debugging('Schedule ' || v_schedule_name || ' does not exist or cannot be dropped.');
+              END;
+          END IF;
+  
+          DBMS_SCHEDULER.CREATE_SCHEDULE(
+              schedule_name   => v_schedule_name,
+              repeat_interval => v_schedule_setting
+          );
 
+          DBMS_SESSION.SLEEP(1);
+  
+          v_job_name := v_current_schema || '.dbx_' || LOWER(v_days(i));
+          v_job_action := '
+              BEGIN
+                  FOR rec IN (SELECT schema_name, job_name, job_status, duration, instance_number
+                              FROM TABLE(dbx_stats.gather_schema_stats(''' || p_schema_name || ''', ' || p_degree || ', ''TRUE''))) LOOP
+                  END LOOP;
+              END;';
+  
+          DBMS_SCHEDULER.CREATE_JOB(
+              job_name        => v_job_name,
+              job_type        => 'PLSQL_BLOCK',
+              job_action      => v_job_action,
+              schedule_name   => v_schedule_name,
+              enabled         => TRUE
+          );
+  
+          debugging('Created schedule and job for ' || v_days(i));
+      END LOOP;
+  
+      debugging('Enable procedure completed.');
+  END;
+    
+  PROCEDURE disable(
+      p_schema_name  VARCHAR2,
+      p_force        BOOLEAN DEFAULT TRUE,
+      p_auto_task    BOOLEAN DEFAULT TRUE
+  ) IS
+      v_debugging_enabled BOOLEAN := is_debugging_enabled();
+      v_schedule_name      VARCHAR2(128);
+      v_job_name           VARCHAR2(128);
+      v_current_schema VARCHAR2(30);
+      v_days               SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY');
+  BEGIN
+      debugging('Starting disable procedure...');
+      v_current_schema := sys_context('userenv', 'current_schema');
+  
+      -- Set auto_task
+      IF p_auto_task THEN
+          DBMS_AUTO_TASK_ADMIN.ENABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+      ELSE
+          DBMS_AUTO_TASK_ADMIN.DISABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+      END IF;
+  
+      FOR i IN 1..v_days.COUNT LOOP
+          v_schedule_name := v_current_schema||'.dbxw_' || LOWER(v_days(i));
+          v_job_name := v_current_schema||'.dbx_' || LOWER(v_days(i));
+  
+          IF p_force THEN
+              BEGIN
+                  DBMS_SCHEDULER.DROP_SCHEDULE(v_schedule_name, FORCE => TRUE);
+                  DBMS_SCHEDULER.DROP_JOB(v_job_name, FORCE => TRUE);
+              EXCEPTION
+                  WHEN OTHERS THEN
+                      debugging('Schedule or job ' || v_schedule_name || ' does not exist or cannot be dropped.');
+              END;
+          END IF;
+  
+          debugging('Dropped schedule and job for ' || v_days(i));
+      END LOOP;
+  
+      debugging('Disable procedure completed.');
+  END;
+
+  
 END dbx_stats;
 /

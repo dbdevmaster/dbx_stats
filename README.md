@@ -18,6 +18,8 @@ The `dbx_stats` package offers a range of procedures and functions to set prefer
     - [get_stale_stats_schema](#get_stale_stats_schema)
     - [gather_schema_stats](#gather_schema_stats)
     - [get_job_status](#get_job_status)
+    - [enable](#enable)
+    - [disable](#disbale)
 - [Analytics](#analytics)
 - [dbx_prefs_manager](#dbx_prefs_manager)
 - [dbx_stats_manager](#dbx_stats_manager)
@@ -179,6 +181,37 @@ Retrieves the status of the currently running and queued jobs.
 ```sql
 -- Get job status
 SELECT * FROM TABLE(dbx_stats.get_job_status);
+```
+
+### enable
+Enable automatic statistics collection
+
+```sql
+set serveroutput on;
+BEGIN
+    dbx_stats.enable(
+        p_schema_name => 'HR', -- or '__REGEXP__HR', 'HR'
+        p_degree => 4,             -- Degree of parallelism
+        p_force => TRUE,           -- Force recreate jobs and scheduler windows
+        p_auto_task => FALSE       -- Disable auto_task statistics collection
+    );
+END;
+/
+```
+
+### disable 
+Disable automatic statistics collection
+
+
+```sql
+BEGIN
+    dbx_stats.disable(
+        schema_name => '__ALL__', -- or '__REGEXP__HR', 'HR'
+        force => TRUE,           -- Force drop existing jobs and scheduler windows
+        auto_task => TRUE        -- Enable auto_task statistics collection
+    );
+END;
+/
 ```
 
 ### Analytics
