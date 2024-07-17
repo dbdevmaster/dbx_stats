@@ -973,6 +973,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       v_purge_log := (dbx_stats_manager('job_purge_log').get_setting = 'TRUE');
   
       LOOP
+          DBMS_SESSION.SLEEP(300);
           v_job_completed := TRUE;
   
           FOR rec IN (
