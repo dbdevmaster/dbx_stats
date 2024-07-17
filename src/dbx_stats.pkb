@@ -1003,7 +1003,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                       WHERE lower(job_name) = lower(jrl.job_name)
                   )
               WHERE 
-                  jrl.job_status NOT IN ('COMPLETED', 'STOPPED') 
+                  jrl.job_status NOT IN ('COMPLETED', 'STOPPED','QUEUED') 
                   AND jrl.g_session_id = v_g_session_id
           ) LOOP
               v_job_completed := FALSE;
