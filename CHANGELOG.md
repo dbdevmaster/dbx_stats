@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.12](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.11...v1.4.12) (2024-07-17)
+
+
+### Bug Fixes
+
+* watch_jobs issue [#2](https://github.com/dbdevmaster/dbx_stats/issues/2) ([77bf0b4](https://github.com/dbdevmaster/dbx_stats/commit/77bf0b4ad8dd28129c472c9e733dec2d9e9267c3))
+
 ### [1.4.11](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.10...v1.4.11) (2024-07-17)
 
 ### [1.4.10](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.9...v1.4.10) (2024-07-17)

@@ -973,6 +973,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       v_purge_log := (dbx_stats_manager('job_purge_log').get_setting = 'TRUE');
   
       LOOP
+          DBMS_SESSION.SLEEP(300);
           v_job_completed := TRUE;
   
           FOR rec IN (
@@ -1003,7 +1004,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                       WHERE lower(job_name) = lower(jrl.job_name)
                   )
               WHERE 
-                  jrl.job_status NOT IN ('COMPLETED', 'STOPPED') 
+                  jrl.job_status NOT IN ('COMPLETED', 'STOPPED','QUEUED') 
                   AND jrl.g_session_id = v_g_session_id
           ) LOOP
               v_job_completed := FALSE;
