@@ -10,7 +10,7 @@ The `dbx_stats` package offers a range of procedures and functions to set prefer
 - [Package Description](#package-description)
 - [Degree and Cluster Option in gather_schema_stats](#degree-and-cluster-option-in-gather_schema_stats)
 - [Installation](#installation)
-    - [Database user permission](#database-user-permissions>)
+    - [Database user permission](#database-user-permissions)
 - [Functions and Procedures](#functions-and-procedures)
     - [procedure parameter](<#procedure-parameter>)
     - [set_prefs](#set_prefs)
