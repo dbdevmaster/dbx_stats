@@ -630,7 +630,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
         -- Extract the regular expression if provided
         IF p_schema_name LIKE '__REGEXP__%' THEN
-            v_regexp := LOWER(SUBSTR(p_schema_name, 11));
+            v_regexp := LOWER(SUBSTR(p_schema_name, 12));
         END IF;
 
         FOR schema_rec IN schema_cursor LOOP
@@ -766,7 +766,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
         -- Extract the regular expression if provided
         IF p_schema_name LIKE '__REGEXP__%' THEN
-            v_regexp := LOWER(SUBSTR(p_schema_name, 11));
+            v_regexp := LOWER(SUBSTR(p_schema_name, 12));
             debugging('v_regexp: '||v_regexp)
         END IF;
 
