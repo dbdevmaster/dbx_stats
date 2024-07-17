@@ -103,7 +103,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                       DBMS_STATS.GATHER_INDEX_STATS(
                                           ownname => ''' || p_schema_name || ''',
                                           indname => rec.index_name,
-                                          degree => 8
+                                          degree => ''' || p_degree || '''
                                       );
                                   END LOOP;
 
@@ -118,7 +118,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                       DBMS_STATS.GATHER_INDEX_STATS(
                                           ownname => ''' || p_schema_name || ''',
                                           indname => rec.index_name,
-                                          degree  => 8
+                                          degree => ''' || p_degree || '''
                                       );
                                   END LOOP;
   
