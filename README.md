@@ -180,7 +180,7 @@ Retrieves the status of the currently running and queued jobs.
 
 ```sql
 -- Get job status
-SELECT * FROM TABLE(dbx_stats.get_job_status);
+SELECT * FROM TABLE(dbx_stats.get_job_status) order by 4 asc, 6;
 ```
 
 ### enable
