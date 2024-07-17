@@ -76,7 +76,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       p_schema_name VARCHAR2, 
       p_instance_number NUMBER, 
       p_max_job_runtime NUMBER,
-      p_g_session_id in VARCHAR2
+      p_g_session_id in VARCHAR2,
+      p_degree in NUMBER
   ) IS
       PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
