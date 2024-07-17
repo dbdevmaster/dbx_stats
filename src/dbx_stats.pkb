@@ -50,7 +50,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                               DBMS_APPLICATION_INFO.SET_ACTION(''WATCHER'');
                               ' || v_owner || '.dbx_stats.watch_jobs(''' || g_session_id || '''); 
                               END;',
-          start_date      => SYSTIMESTAMP + INTERVAL '10' SECOND,
+          start_date      => SYSTIMESTAMP + INTERVAL '120' SECOND,
           enabled         => TRUE,
           end_date        => NULL,
           auto_drop       => TRUE,
@@ -1025,7 +1025,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                   update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
               END IF;
   
-              DBMS_SESSION.SLEEP(3);
+              DBMS_SESSION.SLEEP(10);
               -- Check if job is not running anymore and update the log table
               IF rec.current_status = 'NOT RUNNING' THEN
                   v_duration := SYSTIMESTAMP - rec.start_time;
@@ -1051,7 +1051,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           END IF;
   
           -- Wait before the next check
-          DBMS_SESSION.SLEEP(10);
+          DBMS_SESSION.SLEEP(60);
       END LOOP;
   EXCEPTION
       WHEN OTHERS THEN
