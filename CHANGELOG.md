@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.7](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.6...v1.4.7) (2024-07-17)
+
+
+### Bug Fixes
+
+* __REGEXP__% mapping changed v_regexp := LOWER(SUBSTR(p_schema_name, 11)); to v_regexp := LOWER(SUBSTR(p_schema_name, 12)); ([acde7b2](https://github.com/dbdevmaster/dbx_stats/commit/acde7b24fa0d1eeec56ac76a053d4a249e415972))
+
 ### [1.4.6](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.5...v1.4.6) (2024-07-17)
 
 ### [1.4.5](https://github.com/dbdevmaster/dbx_stats/compare/v1.4.4...v1.4.5) (2024-07-17)
