@@ -9,7 +9,10 @@ The `dbx_stats` package offers a range of procedures and functions to set prefer
 - [Key Features](#key-features)
 - [Package Description](#package-description)
 - [Degree and Cluster Option in gather_schema_stats](#degree-and-cluster-option-in-gather_schema_stats)
+- [Installation](#installation)
+    - [Database user permission](<README#Database user permissions>)
 - [Functions and Procedures](#functions-and-procedures)
+    - [procedure parameter](<README#procedure parameter>)
     - [set_prefs](#set_prefs)
     - [get_prefs_schema_tbls](#get_prefs_schema_tbls)
     - [get_stale_stats_schema](#get_stale_stats_schema)
@@ -46,6 +49,15 @@ The `gather_schema_stats` function allows you to gather schema statistics in par
 - **Cluster**: When set to TRUE, jobs are distributed across all available instances in the cluster. This helps in balancing the load across the cluster nodes.
 
 
+## Installation
+
+### Database user permissions
+```sql
+grant create job to <username>;
+grant manage schedule to <username>;
+grant analyze any to <username>;
+```
+
 ## Functions and Procedures
 
 - **set_prefs**: Sets preferences for a specific schema and table.
@@ -56,15 +68,10 @@ The `gather_schema_stats` function allows you to gather schema statistics in par
 - **dbx_prefs_manager**: Manages preferences used by the `dbx_stats` package.
 - **dbx_stats_manager**: Manages various settings used by the `dbx_stats` package.
 
-## Installation
-
-### Database user permissions
-```sql
-grant create job to <username>;
-grant manage schedule to <username>;
-grant analyze any to <username>;
-```
-
+### procedure parameter
+- ***`__ALL__`***: will loop over all users which are not maintained by oracle 
+- ***`__REGEXP__HR`***: will loop over all user which are not maintained by oracle and where the username contains `HR`
+- ***`__REGEXP__^HR`***: will loop over all user which are not maintained by oracle and where the username starts with `^HR`
 
 ### set_prefs
 Sets preferences for a specific schema and table.
