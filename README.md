@@ -12,7 +12,7 @@ The `dbx_stats` package offers a range of procedures and functions to set prefer
 - [Installation](#installation)
     - [Database user permission](#database-user-permissions>)
 - [Functions and Procedures](#functions-and-procedures)
-    - [procedure parameter](<#procedure parameter>)
+    - [procedure parameter](<#procedure-parameter>)
     - [set_prefs](#set_prefs)
     - [get_prefs_schema_tbls](#get_prefs_schema_tbls)
     - [get_stale_stats_schema](#get_stale_stats_schema)
