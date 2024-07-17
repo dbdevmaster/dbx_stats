@@ -767,6 +767,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         -- Extract the regular expression if provided
         IF p_schema_name LIKE '__REGEXP__%' THEN
             v_regexp := LOWER(SUBSTR(p_schema_name, 11));
+            debugging('v_regexp: '||v_regexp)
         END IF;
 
         -- Determine instance number if cluster option is enabled
