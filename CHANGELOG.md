@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.1...v1.5.2) (2024-07-18)
+
+
+### Bug Fixes
+
+* syntax ([7a5242d](https://github.com/dbdevmaster/dbx_stats/commit/7a5242dc2c068183a7bdd748556042f8453f2af9))
+
 ### [1.5.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.0...v1.5.1) (2024-07-18)
 
 
