@@ -1110,12 +1110,11 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           DBMS_SESSION.SLEEP(1);
   
           v_job_name := v_current_schema || '.dbx_' || LOWER(v_days(i));
-          v_job_action := '
-              BEGIN
-                  FOR rec IN (SELECT schema_name, job_name, job_status, duration, instance_number
-                              FROM TABLE(dbx_stats.gather_schema_stats(''' || p_schema_name || ''', ' || p_degree || ', ''TRUE''))) LOOP
-                  END LOOP;
-              END;';
+          v_job_action := 'BEGIN ' ||
+                        'FOR rec IN (SELECT schema_name, job_name, job_status, duration, instance_number ' ||
+                                    'FROM TABLE(dbx_stats.gather_schema_stats(''' || p_schema_name || ''', ' || p_degree || ', ''TRUE''))) LOOP ' ||
+                        'END LOOP; ' ||
+                        'END;';
   
           DBMS_SCHEDULER.CREATE_JOB(
               job_name        => v_job_name,
