@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.4](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.3...v1.5.4) (2024-07-18)
+
+
+### Bug Fixes
+
+* [#12](https://github.com/dbdevmaster/dbx_stats/issues/12) ora-01403 no data found ([d718e97](https://github.com/dbdevmaster/dbx_stats/commit/d718e97e519770cbb6d43c1c5c06a7e96e801bd8))
+
 ### [1.5.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.2...v1.5.3) (2024-07-18)
 
 
