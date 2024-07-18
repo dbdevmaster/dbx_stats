@@ -58,6 +58,7 @@ The `gather_schema_stats` function allows you to gather schema statistics in par
 grant create job to <username>;
 grant manage schedule to <username>;
 grant analyze any to <username>;
+grant execute on dbms_auto_task_admin to <username>;
 ```
 
 ## Functions and Procedures

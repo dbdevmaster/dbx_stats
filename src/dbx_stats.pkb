@@ -1072,6 +1072,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       p_auto_task    BOOLEAN DEFAULT FALSE
   ) IS
       v_debugging_enabled BOOLEAN := is_debugging_enabled();
+      v_sql clob;
       v_schedule_setting   VARCHAR2(100);
       v_job_action         VARCHAR2(2000);
       v_job_name           VARCHAR2(128);
@@ -1084,9 +1085,11 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
   
       -- Set auto_task
       IF p_auto_task THEN
-          DBMS_AUTO_TASK_ADMIN.ENABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+          v_sql := 'BEGIN DBMS_AUTO_TASK_ADMIN.ENABLE(client_name => ''auto optimizer stats collection'', operation => NULL, window_name => NULL); END;'
+          execute immediate v_sql;
       ELSE
-          DBMS_AUTO_TASK_ADMIN.DISABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+          v_sql := 'BEGIN DBMS_AUTO_TASK_ADMIN.DISABLE(client_name => ''auto optimizer stats collection'', operation => NULL, window_name => NULL); END;'
+          execute immediate v_sql;
       END IF;
   
       FOR i IN 1..v_days.COUNT LOOP
@@ -1146,9 +1149,11 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
   
       -- Set auto_task
       IF p_auto_task THEN
-          DBMS_AUTO_TASK_ADMIN.ENABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+          v_sql := 'BEGIN DBMS_AUTO_TASK_ADMIN.ENABLE(client_name => ''auto optimizer stats collection'', operation => NULL, window_name => NULL); END;'
+          execute immediate v_sql;
       ELSE
-          DBMS_AUTO_TASK_ADMIN.DISABLE(client_name => 'auto optimizer stats collection', operation => NULL, window_name => NULL);
+          v_sql := 'BEGIN DBMS_AUTO_TASK_ADMIN.DISABLE(client_name => ''auto optimizer stats collection'', operation => NULL, window_name => NULL); END;'
+          execute immediate v_sql;
       END IF;
   
       FOR i IN 1..v_days.COUNT LOOP
