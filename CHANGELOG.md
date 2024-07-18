@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.5](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.4...v1.5.5) (2024-07-18)
+
+
+### Bug Fixes
+
+* [#14](https://github.com/dbdevmaster/dbx_stats/issues/14) convert v_max_job_runtime to minutes ([0984b3c](https://github.com/dbdevmaster/dbx_stats/commit/0984b3c5804ddc4be1fe0f74b69f479c10196cae))
+
 ### [1.5.4](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.3...v1.5.4) (2024-07-18)
 
 
