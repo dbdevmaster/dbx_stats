@@ -1093,12 +1093,14 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       END IF;
   
       FOR i IN 1..v_days.COUNT LOOP
+          v_job_name := v_current_schema || '.dbx_' || LOWER(v_days(i));
           v_schedule_name := v_current_schema || '.dbxw_' || LOWER(v_days(i));
           v_schedule_setting := dbx_stats_manager('SCHEDULE_WINDOW_' || UPPER(v_days(i))).get_setting;
   
           IF p_force THEN
               BEGIN
                   DBMS_SCHEDULER.DROP_SCHEDULE(v_schedule_name, FORCE => TRUE);
+                  DBMS_SCHEDULER.DROP_JOB(v_job_name);
               EXCEPTION
                   WHEN OTHERS THEN
                       debugging('Schedule ' || v_schedule_name || ' does not exist or cannot be dropped.');
@@ -1112,13 +1114,26 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
           DBMS_SESSION.SLEEP(1);
   
-          v_job_name := v_current_schema || '.dbx_' || LOWER(v_days(i));
-          v_job_action := 'BEGIN ' ||
-                        'FOR rec IN (SELECT schema_name, job_name, job_status, duration, instance_number ' ||
-                                    'FROM TABLE(dbx_stats.gather_schema_stats(''' || p_schema_name || ''', ' || p_degree || ', ''TRUE''))) LOOP ' ||
-                        'END LOOP; ' ||
-                        'END;';
-  
+          v_job_action := 'SET SERVEROUTPUT ON ' ||
+                'DECLARE ' ||
+                'CURSOR result_cursor IS ' ||
+                'SELECT schema_name, job_name, job_status, duration, instance_number ' ||
+                'FROM TABLE(dbx_stats.gather_schema_stats(''' || p_schema_name || ''', ' || p_degree || ', ''TRUE'')); ' ||
+                'v_result_row result_cursor%ROWTYPE; ' ||
+                'BEGIN ' ||
+                'OPEN result_cursor; ' ||
+                'LOOP ' ||
+                'FETCH result_cursor INTO v_result_row; ' ||
+                'EXIT WHEN result_cursor%NOTFOUND; ' ||
+                'DBMS_OUTPUT.PUT_LINE(''Schema: '' || v_result_row.schema_name || '','' || ' ||
+                ''', Job Name: '' || v_result_row.job_name || '','' || ' ||
+                ''', Status: '' || v_result_row.job_status || '','' || ' ||
+                ''', Duration: '' || TO_CHAR(v_result_row.duration, ''HH24:MI:SS'') || '','' || ' ||
+                ''', Instance: '' || v_result_row.instance_number); ' ||
+                'END LOOP; ' ||
+                'CLOSE result_cursor; ' ||
+                'END; ';
+
           DBMS_SCHEDULER.CREATE_JOB(
               job_name        => v_job_name,
               job_type        => 'PLSQL_BLOCK',
