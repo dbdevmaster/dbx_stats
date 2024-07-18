@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.6](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.5...v1.5.6) (2024-07-18)
+
+
+### Bug Fixes
+
+* dbs_stats_manger('job_auto_[drop|purg] is not droping | purging jobs [#17](https://github.com/dbdevmaster/dbx_stats/issues/17) ([255edc4](https://github.com/dbdevmaster/dbx_stats/commit/255edc4584bf49062a279b70469cda7c92aa7218))
+
 ### [1.5.5](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.4...v1.5.5) (2024-07-18)
 
 
