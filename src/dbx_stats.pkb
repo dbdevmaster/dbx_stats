@@ -757,7 +757,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
         v_start_time := SYSTIMESTAMP;
 
-        v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_duration').get_setting) + 1; -- Add a few ticks to max job runtime
+        v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_duration').get_setting) * 60 + 1; -- Add a few ticks to max job runtime
 
 
         -- Determine if clustering is enabled
