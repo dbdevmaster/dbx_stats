@@ -1,6 +1,6 @@
 set serveroutput on;
 DECLARE
-    p_schema_name VARCHAR2(128) := '__REGEXP__^EGPDBFRM_DATA';
+    p_schema_name VARCHAR2(128) := '__REGEXP__^HR';
     v_regexp      VARCHAR2(128);
     v_count       NUMBER;
 BEGIN
