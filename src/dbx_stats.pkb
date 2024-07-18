@@ -968,8 +968,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       -- v_max_job_runtime := 2; -- testing
 
       -- Get the settings for auto_drop and purge_log
-      v_auto_drop := (dbx_stats_manager('job_auto_drop').get_setting = 'TRUE');
-      v_purge_log := (dbx_stats_manager('job_purge_log').get_setting = 'TRUE');
+      v_auto_drop := (lower(dbx_stats_manager('job_auto_drop').get_setting) = lower('TRUE'));
+      v_purge_log := (lower(dbx_stats_manager('job_purge_log').get_setting) = lower('TRUE'));
   
       LOOP
           DBMS_SESSION.SLEEP(300);
