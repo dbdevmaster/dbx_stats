@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.2...v1.5.3) (2024-07-18)
+
+
+### Bug Fixes
+
+* [#10](https://github.com/dbdevmaster/dbx_stats/issues/10) run dbx_<weekday> dbms_scheduler job ([ae48054](https://github.com/dbdevmaster/dbx_stats/commit/ae480545c7f95a987c56ee1ea4e6bf811bda5acd))
+
 ### [1.5.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.1...v1.5.2) (2024-07-18)
 
 
