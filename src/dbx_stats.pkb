@@ -1114,8 +1114,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
           DBMS_SESSION.SLEEP(1);
   
-          v_job_action := 'SET SERVEROUTPUT ON ' ||
-                'DECLARE ' ||
+          v_job_action := 'DECLARE ' ||
                 'CURSOR result_cursor IS ' ||
                 'SELECT schema_name, job_name, job_status, duration, instance_number ' ||
                 'FROM TABLE(dbx_stats.gather_schema_stats(''' || p_schema_name || ''', ' || p_degree || ', ''TRUE'')); ' ||
