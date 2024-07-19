@@ -259,6 +259,10 @@ GROUP BY
 ORDER BY 
     object_type, partitioned, stale_stats;
 ```
+```sql
+-- check gv$session
+select inst_id,sid,username,schemaname,client_identifier,machine,program,module,action from gv$session where client_info like 'dbx_%';
+```
 
 ### dbx_prefs_manager
 
