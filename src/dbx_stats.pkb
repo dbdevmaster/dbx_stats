@@ -809,7 +809,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Insert initial job record
             debugging('Insert initial job record');
-            insert_job_record(g_session_id, schema_rec.username, v_job_name, v_instance_number, v_session_id);
+            insert_job_record(g_session_id, schema_rec.username, v_job_name, v_node_id, v_session_id);
 
             -- Create and run the job
             create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime, g_session_id, p_degree);
