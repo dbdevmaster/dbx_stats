@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.7](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.6...v1.5.7) (2024-07-19)
+
+
+### Bug Fixes
+
+* [#16](https://github.com/dbdevmaster/dbx_stats/issues/16), [#19](https://github.com/dbdevmaster/dbx_stats/issues/19) gather_schema_stats is not distributed over cluster instance ([6d2fd01](https://github.com/dbdevmaster/dbx_stats/commit/6d2fd0144e4c4eb0424aba5d3d55feeafcd269b2))
+
 ### [1.5.6](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.5...v1.5.6) (2024-07-18)
 
 
