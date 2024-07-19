@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.8](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.7...v1.5.8) (2024-07-19)
+
+
+### Bug Fixes
+
+* [#21](https://github.com/dbdevmaster/dbx_stats/issues/21) wrong instance_number in job_recod table ([b8f7ca3](https://github.com/dbdevmaster/dbx_stats/commit/b8f7ca31d121cb0f25aa1c5ea5e1b7cc466e9613))
+
 ### [1.5.7](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.6...v1.5.7) (2024-07-19)
 
 
