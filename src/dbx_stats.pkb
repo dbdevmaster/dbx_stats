@@ -761,7 +761,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
 
         -- Determine if clustering is enabled
-        v_cluster := (p_cluster = 'TRUE');
+        v_cluster := (lower(p_cluster) = lower('TRUE'));
 
         -- Extract the regular expression if provided
         IF p_schema_name LIKE '__REGEXP__%' THEN
@@ -813,6 +813,9 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Create and run the job
             create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime, g_session_id, p_degree);
+
+            -- decrease v_all_jobs for correct distribution over all clusters
+            v_all_jobs := v_all_jobs - 1;
 
             -- Retrieve current session ID
             SELECT SYS_CONTEXT('USERENV', 'SID')
@@ -1035,14 +1038,14 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                   update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
 
                   -- Drop the job if auto drop is enabled
-                  --IF v_auto_drop THEN
+                  IF v_auto_drop THEN
                       drop_job(rec.job_name);
-                  --END IF;
+                  END IF;
 
                   -- Purge the log if purge log is enabled
-                  --IF v_purge_log THEN
+                  IF v_purge_log THEN
                       purge_log(rec.job_name);
-                  --END IF;
+                  END IF;
 
               END IF;
           END LOOP;
