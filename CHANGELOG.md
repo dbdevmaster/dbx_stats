@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.11](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.10...v1.5.11) (2024-07-22)
+
+
+### Bug Fixes
+
+* [#24](https://github.com/dbdevmaster/dbx_stats/issues/24) use defer false on dbms_scheduler.drop_job ([26d48f0](https://github.com/dbdevmaster/dbx_stats/commit/26d48f0c353e48fd36e1523f7b129cf80cca0968))
+
 ### [1.5.10](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.9...v1.5.10) (2024-07-22)
 
 
