@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.9](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.8...v1.5.9) (2024-07-22)
+
+
+### Bug Fixes
+
+* [#23](https://github.com/dbdevmaster/dbx_stats/issues/23) stop_job not working replaced with drop_job ([95d0fbd](https://github.com/dbdevmaster/dbx_stats/commit/95d0fbd194e15dcf53e5eff0d62d02212a08a1ab))
+
 ### [1.5.8](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.7...v1.5.8) (2024-07-19)
 
 
