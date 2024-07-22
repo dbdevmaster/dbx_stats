@@ -254,7 +254,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
     PROCEDURE drop_job(p_job_name VARCHAR2) IS
     PRAGMA AUTONOMOUS_TRANSACTION;
     BEGIN
-        DBMS_SCHEDULER.DROP_JOB(p_job_name);
+        DBMS_SCHEDULER.DROP_JOB(p_job_name, DEFER=>FALSE, FORCE=>TRUE);
         COMMIT;
     EXCEPTION
         WHEN OTHERS THEN
@@ -1016,7 +1016,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
               -- Check if overall max_runtime is exceeded
               IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_runtime THEN
                   --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
-                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, force => TRUE);
+                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
                   -- Update job record to STOPPED with additional details
                   v_duration := SYSTIMESTAMP - rec.start_time;
                   v_job_status := 'STOPPED';
@@ -1026,7 +1026,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
               -- Check if individual job max_job_runtime is exceeded
               IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_job_runtime THEN
                   --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
-                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, force => TRUE);
+                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
                   -- Update job record to STOPPED with additional details
                   v_duration := SYSTIMESTAMP - rec.start_time;
                   v_job_status := 'STOPPED';
@@ -1106,7 +1106,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           IF p_force THEN
               BEGIN
                   DBMS_SCHEDULER.DROP_SCHEDULE(v_schedule_name, FORCE => TRUE);
-                  DBMS_SCHEDULER.DROP_JOB(v_job_name);
+                  DBMS_SCHEDULER.DROP_JOB(v_job_name, defer => FALSE, force => TRUE);
               EXCEPTION
                   WHEN OTHERS THEN
                       debugging('Schedule ' || v_schedule_name || ' does not exist or cannot be dropped.');
@@ -1184,7 +1184,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           IF p_force THEN
               BEGIN
                   DBMS_SCHEDULER.DROP_SCHEDULE(v_schedule_name, FORCE => TRUE);
-                  DBMS_SCHEDULER.DROP_JOB(v_job_name, FORCE => TRUE);
+                  DBMS_SCHEDULER.DROP_JOB(v_job_name, DEFER => FALSE, FORCE => TRUE);
               EXCEPTION
                   WHEN OTHERS THEN
                       debugging('Schedule or job ' || v_schedule_name || ' does not exist or cannot be dropped.');
