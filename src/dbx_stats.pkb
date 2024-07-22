@@ -45,6 +45,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           job_name        => 'D__WATCHER__D',
           job_type        => 'PLSQL_BLOCK',
           job_action      => 'BEGIN
+                              DBMS_SESSION.SET_IDENTIFIER(''' || p_g_session_id || ''');
                               DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
                               DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
                               DBMS_APPLICATION_INFO.SET_ACTION(''WATCHER'');
@@ -1014,7 +1015,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
   
               -- Check if overall max_runtime is exceeded
               IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_runtime THEN
-                  DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
+                  --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
+                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, force => TRUE);
                   -- Update job record to STOPPED with additional details
                   v_duration := SYSTIMESTAMP - rec.start_time;
                   v_job_status := 'STOPPED';
@@ -1023,7 +1025,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
   
               -- Check if individual job max_job_runtime is exceeded
               IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_job_runtime THEN
-                  DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
+                  --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
+                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, force => TRUE);
                   -- Update job record to STOPPED with additional details
                   v_duration := SYSTIMESTAMP - rec.start_time;
                   v_job_status := 'STOPPED';
