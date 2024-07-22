@@ -221,12 +221,13 @@ Provides queries for analyzing the results of `dbx_stats` functions.
 ```sql
 -- dbms_stats.get_prefs - group by schema
 SELECT schema_name,
+       object_type,
        partitioned,
-       pref_type,
+       pref_name,
        LISTAGG(DISTINCT pref_value, ', ') WITHIN GROUP (ORDER BY pref_value) AS distinct_values
 FROM TABLE(dbx_stats.get_prefs_schema_tbls('HR'))
-GROUP BY schema_name, partitioned, pref_type
-ORDER BY schema_name, partitioned, pref_type;
+GROUP BY schema_name,object_type, partitioned, pref_name
+ORDER BY schema_name,object_type, partitioned, pref_name;
 ```
 
 ```sql
