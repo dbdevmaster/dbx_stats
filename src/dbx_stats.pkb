@@ -45,7 +45,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
           job_name        => 'D__WATCHER__D',
           job_type        => 'PLSQL_BLOCK',
           job_action      => 'BEGIN
-                              DBMS_SESSION.SET_IDENTIFIER(''' || p_g_session_id || ''');
+                              DBMS_SESSION.SET_IDENTIFIER(''' || g_session_id || ''');
                               DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
                               DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
                               DBMS_APPLICATION_INFO.SET_ACTION(''WATCHER'');
