@@ -5,6 +5,7 @@ DECLARE
     v_max_runtime dbx_stats_manager := dbx_stats_manager('MAX_RUNTIME');
     v_job_auto_drop dbx_stats_manager := dbx_stats_manager('JOB_AUTO_DROP');
     v_job_purge_log dbx_stats_manager := dbx_stats_manager('JOB_PURGE_LOG');
+    v_fetch_limit dbx_stats_manager := dbx_stats_manager('FETCH_LIMIT');
     v_trace dbx_stats_manager := dbx_stats_manager('TRACE');
     v_schedule_window_monday dbx_stats_manager := dbx_stats_manager('SCHEDULE_WINDOW_MONDAY');
     v_schedule_window_tuesday dbx_stats_manager := dbx_stats_manager('SCHEDULE_WINDOW_TUESDAY');
@@ -21,6 +22,7 @@ BEGIN
     v_job_auto_drop.set_setting('TRUE'); -- default true
     v_job_purge_log.set_setting('TRUE'); -- default true
     v_trace.set_setting('FALSE'); -- default false
+    v_fetch_limit.set_setting('10000'); -- fetch limit
 
     -- Schedule window settings
     v_schedule_window_monday.set_setting('FREQ=DAILY;BYDAY=MON;BYHOUR=6;BYMINUTE=30;BYSECOND=0'); -- default

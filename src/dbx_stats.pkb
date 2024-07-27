@@ -80,57 +80,76 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       p_degree in NUMBER
   ) IS
       PRAGMA AUTONOMOUS_TRANSACTION;
+      v_offset NUMBER := 0;
+      v_limit NUMBER;
+      v_limit_setting dbx_stats_manager := dbx_stats_manager('FETCH_LIMIT'); -- Fetch the limit setting from dbx_stats_manager
   BEGIN
       DBMS_SCHEDULER.CREATE_JOB(
-          job_name        => LOWER(p_job_name),
-          job_type        => 'PLSQL_BLOCK',
-          job_action      => 'BEGIN 
-                                  DBMS_SESSION.SET_IDENTIFIER(''' || p_g_session_id || ''');
-                                  DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
-                                  DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
-                                  DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || ''' || p_schema_name || ''' || '''');
-                                  
-                                  -- Gather schema stats
-                                  DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''', degree=> '''|| p_degree || ''');
-  
-                                  -- Gather stale index stats
-                                  FOR rec IN (SELECT index_name 
-                                              FROM dba_ind_statistics 
-                                              WHERE owner = ''' || p_schema_name || ''' 
-                                                AND stale_stats = ''YES'' )
-                                  LOOP
-                                      DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
-                                      DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
-                                      DBMS_STATS.GATHER_INDEX_STATS(
-                                          ownname => ''' || p_schema_name || ''',
-                                          indname => rec.index_name,
-                                          degree => ''' || p_degree || '''
-                                      );
-                                  END LOOP;
+        job_name        => LOWER(p_job_name),
+        job_type        => 'PLSQL_BLOCK',
+        job_action      => 'BEGIN 
+                                DBMS_SESSION.SET_IDENTIFIER(''' || p_g_session_id || ''');
+                                DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
+                                DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
+                                DBMS_APPLICATION_INFO.SET_ACTION(''Schema: '' || ''' || p_schema_name || ''' || '''');
+                                
+                                -- Gather schema stats
+                                DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''', degree=> '''|| p_degree || ''');
+                                
+                                -- Gather stale index stats
+                                LOOP
+                                    FOR rec IN (SELECT index_name 
+                                                FROM (SELECT index_name, ROWNUM rnum 
+                                                      FROM dba_ind_statistics 
+                                                      WHERE owner = ''' || p_schema_name || ''' 
+                                                        AND stale_stats = ''YES''
+                                                      AND ROWNUM <= ' || v_limit || ') 
+                                                WHERE rnum > ' || v_offset || ') LOOP
+                                        DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
+                                        DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
+                                        DBMS_STATS.GATHER_INDEX_STATS(
+                                            ownname => ''' || p_schema_name || ''',
+                                            indname => rec.index_name,
+                                            degree => ''' || p_degree || '''
+                                        );
+                                    END LOOP;
+                                    
+                                    v_offset := v_offset + v_limit;
+                                    EXIT WHEN SQL%NOTFOUND;
+                                END LOOP;
 
-                                  -- Gather empty index stats
-                                  FOR rec IN (SELECT index_name 
-                                              FROM dba_ind_statistics 
-                                              WHERE owner = ''' || p_schema_name || ''' 
-                                                AND stale_stats is null)
-                                  LOOP
-                                      DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
-                                      DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
-                                      DBMS_STATS.GATHER_INDEX_STATS(
-                                          ownname => ''' || p_schema_name || ''',
-                                          indname => rec.index_name,
-                                          degree => ''' || p_degree || '''
-                                      );
-                                  END LOOP;
-  
-                                  -- Optional: Sleep to simulate extended processing time
-                                  DBMS_SESSION.SLEEP(5);
-                              END;',
-          start_date      => SYSTIMESTAMP,
-          end_date        => NULL,
-          enabled         => TRUE,
-          comments        => 'Gather stats for schema ' || p_schema_name,
-          auto_drop       => FALSE
+                                v_offset := 0;
+                                
+                                -- Gather empty index stats
+                                LOOP
+                                    FOR rec IN (SELECT index_name 
+                                                FROM (SELECT index_name, ROWNUM rnum 
+                                                      FROM dba_ind_statistics 
+                                                      WHERE owner = ''' || p_schema_name || ''' 
+                                                        AND stale_stats IS NULL
+                                                      AND ROWNUM <= ' || v_limit || ') 
+                                                WHERE rnum > ' || v_offset || ') LOOP
+                                        DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
+                                        DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
+                                        DBMS_STATS.GATHER_INDEX_STATS(
+                                            ownname => ''' || p_schema_name || ''',
+                                            indname => rec.index_name,
+                                            degree => ''' || p_degree || '''
+                                        );
+                                    END LOOP;
+                                    
+                                    v_offset := v_offset + v_limit;
+                                    EXIT WHEN SQL%NOTFOUND;
+                                END LOOP;
+
+                                -- Optional: Sleep to simulate extended processing time
+                                DBMS_SESSION.SLEEP(5);
+                            END;',
+        start_date      => SYSTIMESTAMP,
+        end_date        => NULL,
+        enabled         => TRUE,
+        comments        => 'Gather stats for schema ' || p_schema_name,
+        auto_drop       => FALSE
       );
   
       IF p_instance_number IS NOT NULL THEN
