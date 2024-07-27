@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.6.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.11...v1.6.0) (2024-07-27)
+
+
+### Features
+
+* fetch limit during gather empty stale stats ([eecc559](https://github.com/dbdevmaster/dbx_stats/commit/eecc559d7212c2dfae9cdc59363997802b8c3939))
+
 ### [1.5.11](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.10...v1.5.11) (2024-07-22)
 
 
