@@ -56,7 +56,7 @@ The `gather_schema_stats` function allows you to gather schema statistics in par
 ### Database user permissions
 ```sql
 grant create job to <username>;
-grant manage schedule to <username>;
+grant manage scheduler to <username>;
 grant analyze any to <username>;
 grant execute on dbms_auto_task_admin to <username>;
 ```
@@ -406,6 +406,11 @@ because of (Doc ID 411960.1) for partitioned table there will be fixed values se
 5. **Oracle DBMS_STATS**
     - [Oracle Documentation](https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_STATS.html)
     - Description: With the DBMS_STATS package you can view and modify optimizer statistics gathered for database objects.
+
+6. **Hard Parse For Large Partitioned Table Is Very Slow (Doc ID 2486764.1)**
+    - [Doc ID: 2486764.1](https://support.oracle.com/epmos/faces/DocumentDisplay?id=2486764.1)
+    - Description: Hard parse (first execution of SQL) for partitioned table that has a lot of partitions / subpartitions is very slow. 
+                   (sql query seen during update statistics)
 
 ### Summary
 
