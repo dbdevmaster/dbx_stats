@@ -59,6 +59,15 @@ grant create job to <username>;
 grant manage scheduler to <username>;
 grant analyze any to <username>;
 grant execute on dbms_auto_task_admin to <username>;
+grant select on dba_tables to <username>;
+grant select on dba_indexes to <username>;
+grant select on dba_ind_statistics to <username>;
+grant select on dba_tab_statistics to <username>;
+grant select on v_$instance to <username>;
+grant select on gv_$instance to <username>;
+grant select on gv_$session to <username>;
+grant select on dba_scheduler_running_jobs to <username>;
+
 ```
 
 ## Functions and Procedures
