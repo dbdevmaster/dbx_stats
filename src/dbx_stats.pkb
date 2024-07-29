@@ -871,7 +871,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 AND CLIENT_IDENTIFIER = g_session_id;
                 debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
 
-                EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
+                EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count + 1;
 
                 -- Wait for a job to complete if the degree is reached
                 DBMS_SESSION.SLEEP(60);
