@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.1...v1.6.2) (2024-07-29)
+
+
+### Bug Fixes
+
+* [#26](https://github.com/dbdevmaster/dbx_stats/issues/26) wait for job to comoplete before submitting new one not working ([cd6d754](https://github.com/dbdevmaster/dbx_stats/commit/cd6d754f7a17198a5fb49a8c627355f0109ee90c))
+* degree ignore watcher job [#28](https://github.com/dbdevmaster/dbx_stats/issues/28) ([aa418fe](https://github.com/dbdevmaster/dbx_stats/commit/aa418fe4741189cb6b1718dcd6c42a8002a8b1c1))
+* fetch_limit for gather index stats [#27](https://github.com/dbdevmaster/dbx_stats/issues/27) ([93421eb](https://github.com/dbdevmaster/dbx_stats/commit/93421eb375d40b83a6e9b0b41a8a62011ceed5fc))
+
 ### [1.6.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.0...v1.6.1) (2024-07-29)
 
 
