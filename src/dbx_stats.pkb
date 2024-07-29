@@ -71,23 +71,35 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
   END create_watcher_job;
 
     -- Autonomous procedure to create and run gather job
-    PROCEDURE create_gather_job(
-      p_job_name VARCHAR2, 
-      p_schema_name VARCHAR2, 
-      p_instance_number NUMBER, 
-      p_max_job_runtime NUMBER,
-      p_g_session_id in VARCHAR2,
-      p_degree in NUMBER
+  PROCEDURE create_gather_job(
+    p_job_name VARCHAR2, 
+    p_schema_name VARCHAR2, 
+    p_instance_number NUMBER, 
+    p_max_job_runtime NUMBER,
+    p_g_session_id VARCHAR2,
+    p_degree NUMBER
   ) IS
-      PRAGMA AUTONOMOUS_TRANSACTION;
-      v_offset NUMBER := 0;
-      v_limit NUMBER;
-      v_limit_setting dbx_stats_manager := dbx_stats_manager('FETCH_LIMIT'); -- Fetch the limit setting from dbx_stats_manager
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    v_offset NUMBER := 0;
+    v_limit NUMBER;
+    v_limit_string VARCHAR2(100);
+    v_limit_setting dbx_stats_manager := dbx_stats_manager('FETCH_LIMIT'); -- Fetch the limit setting from dbx_stats_manager
+    v_debugging_enabled BOOLEAN;
   BEGIN
-      DBMS_SCHEDULER.CREATE_JOB(
+    v_debugging_enabled := is_debugging_enabled();
+    v_limit_string := v_limit_setting.get_setting; -- Get the limit setting value
+    v_limit := TO_NUMBER(v_limit_string); -- Convert the VARCHAR2 value to NUMBER
+
+    IF v_debugging_enabled THEN
+        debugging('Starting create_gather_job procedure...');
+    END IF;
+
+    DBMS_SCHEDULER.CREATE_JOB(
         job_name        => LOWER(p_job_name),
         job_type        => 'PLSQL_BLOCK',
-        job_action      => 'BEGIN 
+        job_action      => 'DECLARE
+                                v_offset NUMBER := 0;
+                            BEGIN 
                                 DBMS_SESSION.SET_IDENTIFIER(''' || p_g_session_id || ''');
                                 DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
                                 DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
@@ -104,7 +116,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                                       WHERE owner = ''' || p_schema_name || ''' 
                                                         AND stale_stats = ''YES''
                                                       AND ROWNUM <= ' || v_limit || ') 
-                                                WHERE rnum > ' || v_offset || ') LOOP
+                                                WHERE rnum > v_offset) LOOP
                                         DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
                                         DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
                                         DBMS_STATS.GATHER_INDEX_STATS(
@@ -114,7 +126,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                         );
                                     END LOOP;
                                     
-                                    v_offset := v_offset + v_limit;
+                                    v_offset := v_offset + ' || v_limit || ';
                                     EXIT WHEN SQL%NOTFOUND;
                                 END LOOP;
 
@@ -128,7 +140,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                                       WHERE owner = ''' || p_schema_name || ''' 
                                                         AND stale_stats IS NULL
                                                       AND ROWNUM <= ' || v_limit || ') 
-                                                WHERE rnum > ' || v_offset || ') LOOP
+                                                WHERE rnum > v_offset) LOOP
                                         DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
                                         DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
                                         DBMS_STATS.GATHER_INDEX_STATS(
@@ -138,7 +150,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                         );
                                     END LOOP;
                                     
-                                    v_offset := v_offset + v_limit;
+                                    v_offset := v_offset + ' || v_limit || ';
                                     EXIT WHEN SQL%NOTFOUND;
                                 END LOOP;
 
@@ -150,27 +162,30 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         enabled         => TRUE,
         comments        => 'Gather stats for schema ' || p_schema_name,
         auto_drop       => FALSE
-      );
-  
-      IF p_instance_number IS NOT NULL THEN
-          DBMS_SCHEDULER.SET_ATTRIBUTE(LOWER(p_job_name), 'INSTANCE_ID', p_instance_number);
-          debugging('set attribute instance_id for job_name: '||p_job_name||' to: '||p_instance_number);
-      END IF;
-      DBMS_SESSION.SLEEP(1);
-  
-      -- Run the job immediately
-      DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
-  
-      COMMIT;
+    );
+
+    IF p_instance_number IS NOT NULL THEN
+        DBMS_SCHEDULER.SET_ATTRIBUTE(LOWER(p_job_name), 'INSTANCE_ID', p_instance_number);
+        debugging('set attribute instance_id for job_name: '||p_job_name||' to: '||p_instance_number);
+    END IF;
+    DBMS_SESSION.SLEEP(1);
+
+    -- Run the job immediately
+    DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
+
+    COMMIT;
   EXCEPTION
-      WHEN OTHERS THEN
-          DBMS_OUTPUT.PUT_LINE('Error in create_gather_job: ' || SQLERRM);
-          IF is_trace_enabled() THEN
-              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
-          END IF;
-          ROLLBACK;
+    WHEN OTHERS THEN
+        debugging('Error in create_gather_job: ' || SQLERRM);
+        IF is_trace_enabled() THEN
+            debugging(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+            debugging(DBMS_UTILITY.FORMAT_ERROR_STACK);
+        END IF;
+        ROLLBACK;
   END create_gather_job;
+
+
+
   
     -- Autonomous procedure to insert initial job record into the log table
     PROCEDURE insert_job_record(v_g_session_id VARCHAR2, p_schema_name VARCHAR2, p_job_name VARCHAR2, p_instance_number NUMBER, p_session_id VARCHAR2) IS
@@ -852,11 +867,11 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 SELECT COUNT(*)
                 INTO v_current_parallel_jobs
                 FROM gv$session
-                WHERE program = 'dbx_stats_client'
+                WHERE client_info = 'dbx_stats_client'
                 AND CLIENT_IDENTIFIER = g_session_id;
                 debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
 
-                EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count;
+                EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count + 1;
 
                 -- Wait for a job to complete if the degree is reached
                 DBMS_SESSION.SLEEP(60);

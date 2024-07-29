@@ -51,6 +51,8 @@ CREATE OR REPLACE TYPE BODY dbx_stats_manager AS
             RETURN 'TRUE';
           WHEN 'job_purge_log' THEN
             RETURN 'TRUE';
+          WHEN 'fetch_limit' THEN
+            RETURN '10000';
           WHEN 'schedule_window_monday' THEN
             RETURN 'FREQ=DAILY;BYDAY=MON;BYHOUR=6;BYMINUTE=30,BYSECOND=0';
           WHEN 'schedule_window_tuesday' THEN
