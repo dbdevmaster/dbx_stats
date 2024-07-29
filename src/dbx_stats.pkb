@@ -33,7 +33,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
     END debugging;
 
     -- Autonomous procedure to create a watcher job
-    PROCEDURE create_watcher_job(g_session_id VARCHAR2) IS
+    PROCEDURE create_watcher_job(g_session_id VARCHAR2, v_max_parallel_jobs number, v_instance_count NUMBER) IS
       PRAGMA AUTONOMOUS_TRANSACTION;
       v_owner VARCHAR2(128);
     BEGIN
@@ -49,7 +49,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                               DBMS_APPLICATION_INFO.SET_CLIENT_INFO(''dbx_stats_client'');
                               DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_schema_stats'');
                               DBMS_APPLICATION_INFO.SET_ACTION(''WATCHER'');
-                              ' || v_owner || '.dbx_stats.watch_jobs(''' || g_session_id || '''); 
+                              ' || v_owner || '.dbx_stats.watch_jobs(''' || g_session_id || ''', ' || v_max_parallel_jobs || ', ' || v_instance_count || '); 
                               END;',
           start_date      => SYSTIMESTAMP + INTERVAL '120' SECOND,
           enabled         => TRUE,
@@ -159,7 +159,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                             END;',
         start_date      => SYSTIMESTAMP,
         end_date        => NULL,
-        enabled         => TRUE,
+        enabled         => FALSE,  -- Change to FALSE
         comments        => 'Gather stats for schema ' || p_schema_name,
         auto_drop       => FALSE
     );
@@ -169,9 +169,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         debugging('set attribute instance_id for job_name: '||p_job_name||' to: '||p_instance_number);
     END IF;
     DBMS_SESSION.SLEEP(1);
-
-    -- Run the job immediately
-    DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
 
     COMMIT;
   EXCEPTION
@@ -183,9 +180,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         END IF;
         ROLLBACK;
   END create_gather_job;
-
-
-
   
     -- Autonomous procedure to insert initial job record into the log table
     PROCEDURE insert_job_record(v_g_session_id VARCHAR2, p_schema_name VARCHAR2, p_job_name VARCHAR2, p_instance_number NUMBER, p_session_id VARCHAR2) IS
@@ -756,185 +750,155 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             END IF;
     END set_prefs;
 
-    FUNCTION gather_schema_stats(
-        p_schema_name IN VARCHAR2,
-        p_degree      IN INTEGER,
-        p_cluster     IN VARCHAR2 DEFAULT 'FALSE'
-    ) RETURN dbx_job_table PIPELINED IS
-        v_max_job_runtime number;
-        v_cluster BOOLEAN;
-        v_regexp VARCHAR2(128);
-        v_instance_number NUMBER;
-        v_instance_count NUMBER;
-        v_job_name VARCHAR2(32);
-        v_current_parallel_jobs NUMBER := 0;
-        v_max_parallel_jobs NUMBER := p_degree;
-        v_start_time TIMESTAMP;
-        v_end_time TIMESTAMP;
-        v_duration INTERVAL DAY TO SECOND;
-        v_job_status dbx_job_table := dbx_job_table(); -- Collection to hold job records
-        v_all_jobs NUMBER := 0;
-        v_running_jobs NUMBER := 0;
-        v_node_id NUMBER;
-        v_session_id VARCHAR2(30);
-        g_session_id VARCHAR(32);
+  FUNCTION gather_schema_stats(
+    p_schema_name IN VARCHAR2,
+    p_degree      IN INTEGER,
+    p_cluster     IN VARCHAR2 DEFAULT 'FALSE'
+  ) RETURN dbx_job_table PIPELINED IS
+    v_max_job_runtime number;
+    v_cluster BOOLEAN;
+    v_regexp VARCHAR2(128);
+    v_instance_number NUMBER;
+    v_instance_count NUMBER;
+    v_job_name VARCHAR2(32);
+    v_current_parallel_jobs NUMBER := 0;
+    v_max_parallel_jobs NUMBER := p_degree;
+    v_start_time TIMESTAMP;
+    v_end_time TIMESTAMP;
+    v_duration INTERVAL DAY TO SECOND;
+    v_job_status dbx_job_table := dbx_job_table(); -- Collection to hold job records
+    v_all_jobs NUMBER := 0;
+    v_running_jobs NUMBER := 0;
+    v_node_id NUMBER;
+    v_session_id VARCHAR2(30);
+    g_session_id VARCHAR(32);
 
-        CURSOR schema_cursor IS
-            SELECT username
-            FROM dba_users
-            WHERE oracle_maintained = 'N'
-              AND (p_schema_name = '__ALL__' OR
-                   (p_schema_name LIKE '__REGEXP__%' AND REGEXP_LIKE(LOWER(username), v_regexp)) OR
-                   LOWER(username) = LOWER(p_schema_name));
+    CURSOR schema_cursor IS
+        SELECT username
+        FROM dba_users
+        WHERE oracle_maintained = 'N'
+          AND (p_schema_name = '__ALL__' OR
+               (p_schema_name LIKE '__REGEXP__%' AND REGEXP_LIKE(LOWER(username), v_regexp)) OR
+               LOWER(username) = LOWER(p_schema_name));
 
-    BEGIN
-        g_session_id := RAWTOHEX(SYS_GUID());
+  BEGIN
+    g_session_id := RAWTOHEX(SYS_GUID());
 
+    v_start_time := SYSTIMESTAMP;
+
+    v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_duration').get_setting) * 60 + 1; -- Add a few ticks to max job runtime
+
+    -- Determine if clustering is enabled
+    v_cluster := (lower(p_cluster) = lower('TRUE'));
+
+    -- Extract the regular expression if provided
+    IF p_schema_name LIKE '__REGEXP__%' THEN
+        v_regexp := LOWER(SUBSTR(p_schema_name, 11));
+        debugging('v_regexp: '||v_regexp);
+    END IF;
+
+    -- Determine instance number if cluster option is enabled
+    IF v_cluster THEN
+        SELECT instance_number
+        INTO v_instance_number
+        FROM v$instance;
+    END IF;
+
+    -- Determine the number of instances if cluster option is enabled
+    IF v_cluster THEN
+        SELECT COUNT(*)
+        INTO v_instance_count
+        FROM gv$instance;
+    END IF;
+
+    -- Initialize the count of all jobs
+    FOR schema_rec IN schema_cursor LOOP
+        v_all_jobs := v_all_jobs + 1;
+    END LOOP;
+
+    -- Create a watcher job
+    create_watcher_job(g_session_id, v_max_parallel_jobs, v_instance_count);
+
+    FOR schema_rec IN schema_cursor LOOP
+        -- Job name can be only 32 characters long
+        v_job_name := SUBSTR(LOWER('dbx_stats_' || schema_rec.username ),1,32);
+
+        IF v_cluster THEN
+            -- Assign instance number for job
+            v_node_id := MOD(v_all_jobs, v_instance_count) + 1;
+            debugging('v_all_jobs: '|| v_all_jobs);
+            debugging('submit next job to inst_id: '|| v_node_id);
+        END IF;
+
+        -- Log job start time
         v_start_time := SYSTIMESTAMP;
 
-        v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_duration').get_setting) * 60 + 1; -- Add a few ticks to max job runtime
+        debugging('gather_schema_stats: Submitting job for schema: ' || schema_rec.username || ', Job name: ' || v_job_name);
 
+        -- Insert initial job record
+        debugging('Insert initial job record');
+        insert_job_record(g_session_id, schema_rec.username, v_job_name, v_node_id, v_session_id);
 
-        -- Determine if clustering is enabled
-        v_cluster := (lower(p_cluster) = lower('TRUE'));
+        -- Create the job (but do not enable it yet)
+        create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime, g_session_id, p_degree);
 
-        -- Extract the regular expression if provided
-        IF p_schema_name LIKE '__REGEXP__%' THEN
-            v_regexp := LOWER(SUBSTR(p_schema_name, 11));
-            debugging('v_regexp: '||v_regexp);
+    END LOOP;
+
+    -- sleep
+    -- DBMS_SESSION.SLEEP(2);
+
+    -- Wait for all jobs to complete
+    LOOP
+        v_running_jobs := 0;
+        FOR rec IN (SELECT COUNT(*) AS running_jobs 
+                    FROM gv$session 
+                    WHERE client_info = 'dbx_stats_client' 
+                    AND module = 'dbx_stats_module' 
+                    AND action LIKE 'Schema%'
+                    AND CLIENT_IDENTIFIER = g_session_id) LOOP
+            v_running_jobs := rec.running_jobs;
+        END LOOP;
+    
+        EXIT WHEN v_running_jobs = 0;
+
+        DBMS_SESSION.SLEEP(20); -- Wait before the next check
+    END LOOP;
+
+    -- Log overall duration and number of schemas processed
+    v_end_time := SYSTIMESTAMP;
+    v_duration := v_end_time - v_start_time;
+
+    DBMS_OUTPUT.PUT_LINE('Overall Duration: ' || TO_CHAR(v_duration, 'HH24:MI:SS'));
+    DBMS_OUTPUT.PUT_LINE('Total Schemas Processed: ' || v_all_jobs);
+
+    -- Return job status from the log table
+    FOR rec IN (SELECT g_session_id, schema_name, job_name, job_status, start_time, duration, instance_number, dbms_scheduler_status, dbms_scheduler_error, dbms_scheduler_info, session_id FROM dbx_job_record_log WHERE session_id = v_session_id) LOOP
+        v_job_status.EXTEND;
+        v_job_status(v_job_status.COUNT) := dbx_job_record(
+            rec.g_session_id,
+            rec.schema_name,
+            rec.job_name,
+            rec.job_status,
+            rec.start_time,
+            rec.duration,
+            rec.instance_number,
+            rec.dbms_scheduler_status,
+            rec.dbms_scheduler_error,
+            rec.dbms_scheduler_info,
+            rec.session_id
+        );
+        PIPE ROW(v_job_status(v_job_status.COUNT));
+    END LOOP;
+
+  EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error in gather_schema_stats: ' || SQLERRM);
+        IF is_trace_enabled() THEN
+          DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+          DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
         END IF;
+  END gather_schema_stats;
 
-        -- Determine instance number if cluster option is enabled
-        IF v_cluster THEN
-            SELECT instance_number
-            INTO v_instance_number
-            FROM v$instance;
-        END IF;
-
-        -- Determine the number of instances if cluster option is enabled
-        IF v_cluster THEN
-            SELECT COUNT(*)
-            INTO v_instance_count
-            FROM gv$instance;
-        END IF;
-
-        -- Initialize the count of all jobs
-        FOR schema_rec IN schema_cursor LOOP
-            v_all_jobs := v_all_jobs + 1;
-        END LOOP;
-
-        -- Create a watcher job
-        create_watcher_job(g_session_id);
-
-        FOR schema_rec IN schema_cursor LOOP
-            -- Job name can be only 32 characters long
-            v_job_name := SUBSTR(LOWER('dbx_stats_' || schema_rec.username ),1,32);
-
-            IF v_cluster THEN
-                -- Assign instance number for job
-                v_node_id := MOD(v_all_jobs, v_instance_count) + 1;
-                debugging('v_all_jobs: '|| v_all_jobs);
-                debugging('submit next job to inst_id: '|| v_node_id);
-            END IF;
-
-            -- Log job start time
-            v_start_time := SYSTIMESTAMP;
-
-            debugging('gather_schema_stats: Submitting job for schema: ' || schema_rec.username || ', Job name: ' || v_job_name);
-
-            -- Insert initial job record
-            debugging('Insert initial job record');
-            insert_job_record(g_session_id, schema_rec.username, v_job_name, v_node_id, v_session_id);
-
-            -- Create and run the job
-            create_gather_job(v_job_name, schema_rec.username, v_node_id, v_max_job_runtime, g_session_id, p_degree);
-
-            -- decrease v_all_jobs for correct distribution over all clusters
-            v_all_jobs := v_all_jobs - 1;
-
-            -- Retrieve current session ID
-            SELECT SYS_CONTEXT('USERENV', 'SID')
-            INTO v_session_id
-            FROM dual;
-
-            -- Update job status to RUNNING
-            debugging('update job status to RUNNING for job: '|| v_job_name);
-            update_job_record(g_session_id, v_job_name, 'RUNNING');
-
-            -- Wait for the job to complete
-            LOOP
-                -- Check the number of currently running jobs
-                SELECT COUNT(*)
-                INTO v_current_parallel_jobs
-                FROM gv$session
-                WHERE client_info = 'dbx_stats_client'
-                AND CLIENT_IDENTIFIER = g_session_id;
-                debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
-
-                EXIT WHEN v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count + 1;
-
-                -- Wait for a job to complete if the degree is reached
-                DBMS_SESSION.SLEEP(60);
-
-            END LOOP;
-
-
-        END LOOP;
-
-        -- sleep
-        DBMS_SESSION.SLEEP(2);
-        -- Wait for all jobs to complete
-        LOOP
-            v_running_jobs := 0;
-            FOR rec IN (SELECT COUNT(*) AS running_jobs 
-                        FROM gv$session 
-                        WHERE client_info = 'dbx_stats_client' 
-                        AND module = 'dbx_stats_module' 
-                        AND action LIKE 'Schema%'
-                        AND CLIENT_IDENTIFIER = g_session_id) LOOP
-                v_running_jobs := rec.running_jobs;
-            END LOOP;
-        
-            EXIT WHEN v_running_jobs = 0;
-
-            DBMS_SESSION.SLEEP(20); -- Wait before the next check
-        END LOOP;
-
-
-        -- Log overall duration and number of schemas processed
-        v_end_time := SYSTIMESTAMP;
-        v_duration := v_end_time - v_start_time;
-
-        DBMS_OUTPUT.PUT_LINE('Overall Duration: ' || TO_CHAR(v_duration, 'HH24:MI:SS'));
-        DBMS_OUTPUT.PUT_LINE('Total Schemas Processed: ' || v_all_jobs);
-
-      -- Return job status from the log table
-        FOR rec IN (SELECT g_session_id, schema_name, job_name, job_status, start_time, duration, instance_number, dbms_scheduler_status, dbms_scheduler_error, dbms_scheduler_info, session_id FROM dbx_job_record_log WHERE session_id = v_session_id) LOOP
-            v_job_status.EXTEND;
-            v_job_status(v_job_status.COUNT) := dbx_job_record(
-                rec.g_session_id,
-                rec.schema_name,
-                rec.job_name,
-                rec.job_status,
-                rec.start_time,
-                rec.duration,
-                rec.instance_number,
-                rec.dbms_scheduler_status,
-                rec.dbms_scheduler_error,
-                rec.dbms_scheduler_info,
-                rec.session_id
-            );
-            PIPE ROW(v_job_status(v_job_status.COUNT));
-        END LOOP;
-
-    EXCEPTION
-        WHEN OTHERS THEN
-            DBMS_OUTPUT.PUT_LINE('Error in gather_schema_stats: ' || SQLERRM);
-            IF is_trace_enabled() THEN
-              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
-            END IF;
-    END gather_schema_stats;
 
     FUNCTION get_job_status RETURN dbx_job_table PIPELINED IS
         v_job_record dbx_job_record;
@@ -987,121 +951,177 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             END IF;
     END clean_up_job_logs;
 
-      PROCEDURE watch_jobs(v_g_session_id VARCHAR2) IS
-        v_max_runtime        NUMBER;
-        v_max_job_runtime    NUMBER;
-        v_duration           INTERVAL DAY TO SECOND;
-        v_status             VARCHAR2(30);
-        v_error              NUMBER;
-        v_info               VARCHAR2(4000);
-        v_current_status     VARCHAR2(30);
-        v_job_completed      BOOLEAN := TRUE;
-        v_job_status         VARCHAR2(30);
-        v_auto_drop          BOOLEAN;
-        v_purge_log          BOOLEAN;
-      BEGIN
-      v_max_runtime := TO_NUMBER(dbx_stats_manager('max_runtime').get_setting) * 60; -- Convert hours to minutes
-      -- v_max_runtime := 1; -- testing
-      v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_duration').get_setting) * 60 + 1; -- Convert hours to minutes and add a few ticks
-      -- v_max_job_runtime := 2; -- testing
+  PROCEDURE update_job_record_instance(
+      p_g_session_id VARCHAR2, 
+      p_job_name VARCHAR2, 
+      p_instance_number NUMBER
+  ) IS
+  BEGIN
+      UPDATE dbx_job_record_log
+      SET instance_number = p_instance_number
+      WHERE job_name = LOWER(p_job_name)
+      AND g_session_id = p_g_session_id;
 
-      -- Get the settings for auto_drop and purge_log
-      v_auto_drop := (lower(dbx_stats_manager('job_auto_drop').get_setting) = lower('TRUE'));
-      v_purge_log := (lower(dbx_stats_manager('job_purge_log').get_setting) = lower('TRUE'));
-  
-      LOOP
-          DBMS_SESSION.SLEEP(300);
-          v_job_completed := TRUE;
-  
-          FOR rec IN (
-              SELECT 
-                  jrl.schema_name, 
-                  jrl.job_name, 
-                  jrl.start_time, 
-                  jrl.job_status, 
-                  rsj.status, 
-                  rsj.log_id,
-                  rsj.error#, 
-                  rsj.additional_info,
-                  CASE 
-                      WHEN drj.job_name IS NOT NULL THEN 'RUNNING'
-                      ELSE 'NOT RUNNING'
-                  END AS current_status
-              FROM 
-                  dbx_job_record_log jrl
-              LEFT JOIN 
-                  dba_scheduler_running_jobs drj 
-                  ON lower(jrl.job_name) = lower(drj.job_name)
-              LEFT JOIN 
-                  dba_scheduler_job_run_details rsj 
-                  ON lower(jrl.job_name) = lower(rsj.job_name) 
-                  AND rsj.log_id IN (
-                      SELECT max(log_id) 
-                      FROM dba_scheduler_job_run_details 
-                      WHERE lower(job_name) = lower(jrl.job_name)
-                  )
-              WHERE 
-                  jrl.job_status NOT IN ('COMPLETED', 'STOPPED','QUEUED') 
-                  AND jrl.g_session_id = v_g_session_id
-          ) LOOP
-              v_job_completed := FALSE;
-              v_job_status := rec.job_status;
-  
-              -- Check if overall max_runtime is exceeded
-              IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_runtime THEN
-                  --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
-                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
-                  -- Update job record to STOPPED with additional details
-                  v_duration := SYSTIMESTAMP - rec.start_time;
-                  v_job_status := 'STOPPED';
-                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
-              END IF;
-  
-              -- Check if individual job max_job_runtime is exceeded
-              IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_job_runtime THEN
-                  --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
-                  DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
-                  -- Update job record to STOPPED with additional details
-                  v_duration := SYSTIMESTAMP - rec.start_time;
-                  v_job_status := 'STOPPED';
-                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
-              END IF;
-  
-              DBMS_SESSION.SLEEP(10);
-              -- Check if job is not running anymore and update the log table
-              IF rec.current_status = 'NOT RUNNING' THEN
-                  v_duration := SYSTIMESTAMP - rec.start_time;
-                  v_job_status := 'COMPLETED';
-                  update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
-
-                  -- Drop the job if auto drop is enabled
-                  IF v_auto_drop THEN
-                      drop_job(rec.job_name);
-                  END IF;
-
-                  -- Purge the log if purge log is enabled
-                  IF v_purge_log THEN
-                      purge_log(rec.job_name);
-                  END IF;
-
-              END IF;
-          END LOOP;
-  
-          -- Exit the loop if all jobs are completed or stopped
-          IF v_job_completed THEN
-              EXIT;
-          END IF;
-  
-          -- Wait before the next check
-          DBMS_SESSION.SLEEP(60);
-      END LOOP;
+      COMMIT;
   EXCEPTION
       WHEN OTHERS THEN
-          DBMS_OUTPUT.PUT_LINE('Error in watch_jobs: ' || SQLERRM);
+          DBMS_OUTPUT.PUT_LINE('Error in update_job_record_instance: ' || SQLERRM);
           IF is_trace_enabled() THEN
               DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
               DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
           END IF;
+          ROLLBACK;
+  END update_job_record_instance;
+
+  PROCEDURE watch_jobs(v_g_session_id VARCHAR2, v_max_parallel_jobs number, v_instance_count NUMBER) IS
+    v_max_runtime        NUMBER;
+    v_max_job_runtime    NUMBER;
+    v_duration           INTERVAL DAY TO SECOND;
+    v_status             VARCHAR2(30);
+    v_error              NUMBER;
+    v_info               VARCHAR2(4000);
+    v_current_status     VARCHAR2(30);
+    v_job_completed      BOOLEAN := TRUE;
+    v_job_status         VARCHAR2(30);
+    v_auto_drop          BOOLEAN;
+    v_purge_log          BOOLEAN;
+    v_min_instance       NUMBER;
+    v_min_job_count      NUMBER;
+    v_running_jobs       NUMBER;
+  BEGIN
+    v_max_runtime := TO_NUMBER(dbx_stats_manager('max_runtime').get_setting) * 60; -- Convert hours to minutes
+    v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_duration').get_setting) * 60 + 1; -- Convert hours to minutes and add a few ticks
+
+    -- Get the settings for auto_drop and purge_log
+    v_auto_drop := (lower(dbx_stats_manager('job_auto_drop').get_setting) = lower('TRUE'));
+    v_purge_log := (lower(dbx_stats_manager('job_purge_log').get_setting) = lower('TRUE'));
+
+    LOOP
+        DBMS_SESSION.SLEEP(15);
+        v_job_completed := TRUE;
+
+        FOR rec IN (
+            SELECT 
+                jrl.schema_name, 
+                jrl.job_name, 
+                jrl.start_time, 
+                jrl.job_status, 
+                rsj.status, 
+                rsj.log_id,
+                rsj.error#, 
+                rsj.additional_info,
+                CASE 
+                    WHEN drj.job_name IS NOT NULL THEN 'RUNNING'
+                    ELSE 'NOT RUNNING'
+                END AS current_status
+            FROM 
+                dbx_job_record_log jrl
+            LEFT JOIN 
+                dba_scheduler_running_jobs drj 
+                ON lower(jrl.job_name) = lower(drj.job_name)
+            LEFT JOIN 
+                dba_scheduler_job_run_details rsj 
+                ON lower(jrl.job_name) = lower(rsj.job_name) 
+                AND rsj.log_id IN (
+                    SELECT max(log_id) 
+                    FROM dba_scheduler_job_run_details 
+                    WHERE lower(job_name) = lower(jrl.job_name)
+                )
+            WHERE 
+                jrl.job_status NOT IN ('COMPLETED', 'STOPPED') 
+                AND jrl.g_session_id = v_g_session_id
+        ) LOOP
+            v_job_completed := FALSE;
+            v_job_status := rec.job_status;
+
+            -- Check if overall max_runtime is exceeded
+            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_runtime THEN
+                DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
+                -- Update job record to STOPPED with additional details
+                v_duration := SYSTIMESTAMP - rec.start_time;
+                v_job_status := 'STOPPED';
+                update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
+            END IF;
+
+            -- Check if individual job max_job_runtime is exceeded
+            IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_job_runtime THEN
+                DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
+                -- Update job record to STOPPED with additional details
+                v_duration := SYSTIMESTAMP - rec.start_time;
+                v_job_status := 'STOPPED';
+                update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
+            END IF;
+
+            DBMS_SESSION.SLEEP(10);
+            -- Check if job is not running anymore and update the log table
+            IF rec.current_status = 'NOT RUNNING' THEN
+                v_duration := SYSTIMESTAMP - rec.start_time;
+                v_job_status := 'COMPLETED';
+                update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
+
+                -- Drop the job if auto drop is enabled
+                IF v_auto_drop THEN
+                    drop_job(rec.job_name);
+                END IF;
+
+                -- Purge the log if purge log is enabled
+                IF v_purge_log THEN
+                    purge_log(rec.job_name);
+                END IF;
+
+            END IF;
+
+            -- Check if any jobs are queued and can be run
+            SELECT COUNT(*)
+            INTO v_running_jobs
+            FROM dba_scheduler_running_jobs
+            WHERE owner = USER
+            AND JOB_NAME != 'D__WATCHER__D';
+
+            IF v_running_jobs < v_max_parallel_jobs * v_instance_count THEN
+                -- Get the next queued job and the instance with the least jobs running
+                FOR rec IN (SELECT job_name 
+                            FROM dba_scheduler_jobs 
+                            WHERE owner = USER 
+                            AND job_name LIKE 'DBX_STATS_%' 
+                            AND enabled = 'FALSE'
+                            AND rownum = 1) LOOP
+
+                    SELECT inst_id, COUNT(*)
+                    INTO v_min_instance, v_min_job_count
+                    FROM gv$session
+                    WHERE client_info = 'dbx_stats_client'
+                    GROUP BY inst_id
+                    ORDER BY COUNT(*)
+                    FETCH FIRST 1 ROWS ONLY;
+                    
+                    DBMS_SCHEDULER.SET_ATTRIBUTE(rec.job_name, 'INSTANCE_ID', v_min_instance);
+                    DBMS_SCHEDULER.ENABLE(rec.job_name);
+                    update_job_record_instance(v_g_session_id, rec.job_name, v_min_instance);
+                    
+                    -- Update the job record to RUNNING status
+                    update_job_record(v_g_session_id, rec.job_name, 'RUNNING');
+
+                    EXIT;
+                END LOOP;
+            END IF;
+        END LOOP;
+
+        -- Exit the loop if all jobs are completed or stopped
+        IF v_job_completed THEN
+            EXIT;
+        END IF;
+
+        -- Wait before the next check
+        DBMS_SESSION.SLEEP(5);
+    END LOOP;
+  EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error in watch_jobs: ' || SQLERRM);
+        IF is_trace_enabled() THEN
+            DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+            DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+        END IF;
   END watch_jobs;
 
   -- Procedure to enable automatic statistics collection
