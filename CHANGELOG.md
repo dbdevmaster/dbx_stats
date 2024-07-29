@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.2...v1.6.3) (2024-07-29)
+
+
+### Bug Fixes
+
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([01294b7](https://github.com/dbdevmaster/dbx_stats/commit/01294b7e40fea23d30ff115ed7ab924d1880390f))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([a4c16ed](https://github.com/dbdevmaster/dbx_stats/commit/a4c16ede41b4fe4d8d5a51de6d4f5ab717575013))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([7de2e50](https://github.com/dbdevmaster/dbx_stats/commit/7de2e505c202745cd81113ce8ce9b421b59afe9d))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([66fd858](https://github.com/dbdevmaster/dbx_stats/commit/66fd8583c164c8186a3054c77d88a787baf13a5b))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([a2e6e17](https://github.com/dbdevmaster/dbx_stats/commit/a2e6e178376f5a12144e4c58d80022ed2f96a3fd))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([981750f](https://github.com/dbdevmaster/dbx_stats/commit/981750f82e33d4acd6f37e6aba3f00e7210fa4f2))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([da157ab](https://github.com/dbdevmaster/dbx_stats/commit/da157ab911bbdf881229f36f1b9333c003bbd63e))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([67373c7](https://github.com/dbdevmaster/dbx_stats/commit/67373c798073d2de6cde0cab960393df68023aea))
+* distribute session correclty over cluster instance [#30](https://github.com/dbdevmaster/dbx_stats/issues/30) ([c3dcad7](https://github.com/dbdevmaster/dbx_stats/commit/c3dcad7c7af42c699524bbaaf61e38ec8984a523))
+
 ### [1.6.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.1...v1.6.2) (2024-07-29)
 
 
