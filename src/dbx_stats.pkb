@@ -845,7 +845,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
     END LOOP;
 
     -- sleep
-    DBMS_SESSION.SLEEP(2);
+    -- DBMS_SESSION.SLEEP(2);
 
     -- Wait for all jobs to complete
     LOOP
@@ -1070,41 +1070,42 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 END IF;
 
             END IF;
+
+            -- Check if any jobs are queued and can be run
+            SELECT COUNT(*)
+            INTO v_running_jobs
+            FROM dba_scheduler_running_jobs
+            WHERE owner = USER
+            AND JOB_NAME != 'D__WATCHER__D';
+
+            IF v_running_jobs < v_max_parallel_jobs * v_instance_count THEN
+                -- Get the next queued job and the instance with the least jobs running
+                FOR rec IN (SELECT job_name 
+                            FROM dba_scheduler_jobs 
+                            WHERE owner = USER 
+                            AND job_name LIKE 'DBX_STATS_%' 
+                            AND enabled = 'FALSE'
+                            AND rownum = 1) LOOP
+
+                    SELECT inst_id, COUNT(*)
+                    INTO v_min_instance, v_min_job_count
+                    FROM gv$session
+                    WHERE client_info = 'dbx_stats_client'
+                    GROUP BY inst_id
+                    ORDER BY COUNT(*)
+                    FETCH FIRST 1 ROWS ONLY;
+                    
+                    DBMS_SCHEDULER.SET_ATTRIBUTE(rec.job_name, 'INSTANCE_ID', v_min_instance);
+                    DBMS_SCHEDULER.ENABLE(rec.job_name);
+                    update_job_record_instance(v_g_session_id, rec.job_name, v_min_instance);
+                    
+                    -- Update the job record to RUNNING status
+                    update_job_record(v_g_session_id, rec.job_name, 'RUNNING');
+
+                    EXIT;
+                END LOOP;
+            END IF;
         END LOOP;
-
-        -- Check if any jobs are queued and can be run
-        SELECT COUNT(*)
-        INTO v_running_jobs
-        FROM dba_scheduler_running_jobs
-        WHERE owner = USER;
-
-        IF v_running_jobs < v_max_parallel_jobs * v_instance_count THEN
-            -- Get the next queued job and the instance with the least jobs running
-            FOR rec IN (SELECT job_name 
-                        FROM dba_scheduler_jobs 
-                        WHERE owner = USER 
-                        AND job_name LIKE 'DBX_STATS_%' 
-                        AND enabled = 'FALSE'
-                        AND rownum = 1) LOOP
-
-                SELECT inst_id, COUNT(*)
-                INTO v_min_instance, v_min_job_count
-                FROM gv$session
-                WHERE client_info = 'dbx_stats_client'
-                GROUP BY inst_id
-                ORDER BY COUNT(*)
-                FETCH FIRST 1 ROWS ONLY;
-
-                DBMS_SCHEDULER.SET_ATTRIBUTE(rec.job_name, 'INSTANCE_ID', v_min_instance);
-                DBMS_SCHEDULER.ENABLE(rec.job_name);
-                update_job_record_instance(v_g_session_id, rec.job_name, v_min_instance);
-
-                -- Update the job record to RUNNING status
-                update_job_record(v_g_session_id, rec.job_name, 'RUNNING');
-
-                EXIT;
-            END LOOP;
-        END IF;
 
         -- Exit the loop if all jobs are completed or stopped
         IF v_job_completed THEN
