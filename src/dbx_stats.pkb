@@ -71,24 +71,24 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
   END create_watcher_job;
 
     -- Autonomous procedure to create and run gather job
-    PROCEDURE create_gather_job(
-      p_job_name VARCHAR2, 
-      p_schema_name VARCHAR2, 
-      p_instance_number NUMBER, 
-      p_max_job_runtime NUMBER,
-      p_g_session_id in VARCHAR2,
-      p_degree in NUMBER
+  PROCEDURE create_gather_job(
+    p_job_name VARCHAR2, 
+    p_schema_name VARCHAR2, 
+    p_instance_number NUMBER, 
+    p_max_job_runtime NUMBER,
+    p_g_session_id VARCHAR2,
+    p_degree NUMBER
   ) IS
-      PRAGMA AUTONOMOUS_TRANSACTION;
-      v_offset NUMBER := 0;
-      v_limit NUMBER;
-      v_limit_string VARCHAR2(100);
-      v_limit_setting dbx_stats_manager := dbx_stats_manager('FETCH_LIMIT'); -- Fetch the limit setting from dbx_stats_manager
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    v_offset NUMBER := 0;
+    v_limit NUMBER;
+    v_limit_string VARCHAR2(100);
+    v_limit_setting dbx_stats_manager := dbx_stats_manager('FETCH_LIMIT'); -- Fetch the limit setting from dbx_stats_manager
   BEGIN
-      v_limit_string := v_limit_setting.get_setting; -- Get the limit setting value
-      v_limit := TO_NUMBER(v_limit_string); -- Convert the VARCHAR2 value to NUMBER
+    v_limit_string := v_limit_setting.get_setting; -- Get the limit setting value
+    v_limit := TO_NUMBER(v_limit_string); -- Convert the VARCHAR2 value to NUMBER
 
-      DBMS_SCHEDULER.CREATE_JOB(
+    DBMS_SCHEDULER.CREATE_JOB(
         job_name        => LOWER(p_job_name),
         job_type        => 'PLSQL_BLOCK',
         job_action      => 'BEGIN 
@@ -101,80 +101,86 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                 DBMS_STATS.GATHER_SCHEMA_STATS(ownname => ''' || p_schema_name || ''', degree=> '''|| p_degree || ''');
                                 
                                 -- Gather stale index stats
-                                LOOP
-                                    FOR rec IN (SELECT index_name 
-                                                FROM (SELECT index_name, ROWNUM rnum 
-                                                      FROM dba_ind_statistics 
-                                                      WHERE owner = ''' || p_schema_name || ''' 
-                                                        AND stale_stats = ''YES''
-                                                      AND ROWNUM <= ' || v_limit || ') 
-                                                WHERE rnum > ' || v_offset || ') LOOP
-                                        DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
-                                        DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
-                                        DBMS_STATS.GATHER_INDEX_STATS(
-                                            ownname => ''' || p_schema_name || ''',
-                                            indname => rec.index_name,
-                                            degree => ''' || p_degree || '''
-                                        );
+                                DECLARE
+                                    v_offset NUMBER := 0;
+                                BEGIN
+                                    LOOP
+                                        FOR rec IN (SELECT index_name 
+                                                    FROM (SELECT index_name, ROWNUM rnum 
+                                                          FROM dba_ind_statistics 
+                                                          WHERE owner = ''' || p_schema_name || ''' 
+                                                            AND stale_stats = ''YES''
+                                                          AND ROWNUM <= ' || v_limit || ') 
+                                                    WHERE rnum > v_offset) LOOP
+                                            DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
+                                            DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
+                                            DBMS_STATS.GATHER_INDEX_STATS(
+                                                ownname => ''' || p_schema_name || ''',
+                                                indname => rec.index_name,
+                                                degree => ''' || p_degree || '''
+                                            );
+                                        END LOOP;
+                                        
+                                        v_offset := v_offset + v_limit;
+                                        EXIT WHEN SQL%NOTFOUND;
                                     END LOOP;
-                                    
-                                    v_offset := v_offset + v_limit;
-                                    EXIT WHEN SQL%NOTFOUND;
-                                END LOOP;
 
-                                v_offset := 0;
-                                
-                                -- Gather empty index stats
-                                LOOP
-                                    FOR rec IN (SELECT index_name 
-                                                FROM (SELECT index_name, ROWNUM rnum 
-                                                      FROM dba_ind_statistics 
-                                                      WHERE owner = ''' || p_schema_name || ''' 
-                                                        AND stale_stats IS NULL
-                                                      AND ROWNUM <= ' || v_limit || ') 
-                                                WHERE rnum > ' || v_offset || ') LOOP
-                                        DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
-                                        DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
-                                        DBMS_STATS.GATHER_INDEX_STATS(
-                                            ownname => ''' || p_schema_name || ''',
-                                            indname => rec.index_name,
-                                            degree => ''' || p_degree || '''
-                                        );
+                                    v_offset := 0;
+                                    
+                                    -- Gather empty index stats
+                                    LOOP
+                                        FOR rec IN (SELECT index_name 
+                                                    FROM (SELECT index_name, ROWNUM rnum 
+                                                          FROM dba_ind_statistics 
+                                                          WHERE owner = ''' || p_schema_name || ''' 
+                                                            AND stale_stats IS NULL
+                                                          AND ROWNUM <= ' || v_limit || ') 
+                                                    WHERE rnum > v_offset) LOOP
+                                            DBMS_APPLICATION_INFO.SET_MODULE(''dbx_stats_module'', ''gather_index_stats'');
+                                            DBMS_APPLICATION_INFO.SET_ACTION(''SchemaIndex: ''|| ''' || p_schema_name || '.'' || rec.index_name );
+                                            DBMS_STATS.GATHER_INDEX_STATS(
+                                                ownname => ''' || p_schema_name || ''',
+                                                indname => rec.index_name,
+                                                degree => ''' || p_degree || '''
+                                            );
+                                        END LOOP;
+                                        
+                                        v_offset := v_offset + v_limit;
+                                        EXIT WHEN SQL%NOTFOUND;
                                     END LOOP;
-                                    
-                                    v_offset := v_offset + v_limit;
-                                    EXIT WHEN SQL%NOTFOUND;
-                                END LOOP;
 
-                                -- Optional: Sleep to simulate extended processing time
-                                DBMS_SESSION.SLEEP(5);
+                                    -- Optional: Sleep to simulate extended processing time
+                                    DBMS_SESSION.SLEEP(5);
+                                END;
                             END;',
         start_date      => SYSTIMESTAMP,
         end_date        => NULL,
         enabled         => TRUE,
         comments        => 'Gather stats for schema ' || p_schema_name,
         auto_drop       => FALSE
-      );
-  
-      IF p_instance_number IS NOT NULL THEN
-          DBMS_SCHEDULER.SET_ATTRIBUTE(LOWER(p_job_name), 'INSTANCE_ID', p_instance_number);
-          debugging('set attribute instance_id for job_name: '||p_job_name||' to: '||p_instance_number);
-      END IF;
-      DBMS_SESSION.SLEEP(1);
-  
-      -- Run the job immediately
-      DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
-  
-      COMMIT;
+    );
+
+    IF p_instance_number IS NOT NULL THEN
+        DBMS_SCHEDULER.SET_ATTRIBUTE(LOWER(p_job_name), 'INSTANCE_ID', p_instance_number);
+        debugging('set attribute instance_id for job_name: '||p_job_name||' to: '||p_instance_number);
+    END IF;
+    DBMS_SESSION.SLEEP(1);
+
+    -- Run the job immediately
+    DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
+
+    COMMIT;
   EXCEPTION
-      WHEN OTHERS THEN
-          DBMS_OUTPUT.PUT_LINE('Error in create_gather_job: ' || SQLERRM);
-          IF is_trace_enabled() THEN
-              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-              DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
-          END IF;
-          ROLLBACK;
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error in create_gather_job: ' || SQLERRM);
+        IF is_trace_enabled() THEN
+            DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+            DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
+        END IF;
+        ROLLBACK;
   END create_gather_job;
+
+
   
     -- Autonomous procedure to insert initial job record into the log table
     PROCEDURE insert_job_record(v_g_session_id VARCHAR2, p_schema_name VARCHAR2, p_job_name VARCHAR2, p_instance_number NUMBER, p_session_id VARCHAR2) IS
