@@ -159,7 +159,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                             END;',
         start_date      => SYSTIMESTAMP,
         end_date        => NULL,
-        enabled         => TRUE,
+        enabled         => FALSE,
         comments        => 'Gather stats for schema ' || p_schema_name,
         auto_drop       => FALSE
     );
@@ -1109,6 +1109,9 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 DBMS_SCHEDULER.ENABLE(rec.job_name);
                 update_job_record_instance(v_g_session_id, rec.job_name, v_min_instance);
 
+                -- Update the job record to RUNNING status
+                update_job_record(v_g_session_id, rec.job_name, 'RUNNING');
+
                 EXIT;
             END LOOP;
         END IF;
@@ -1129,6 +1132,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             DBMS_OUTPUT.PUT_LINE(DBMS_UTILITY.FORMAT_ERROR_STACK);
         END IF;
   END watch_jobs;
+
 
   -- Procedure to enable automatic statistics collection
   PROCEDURE enable(
