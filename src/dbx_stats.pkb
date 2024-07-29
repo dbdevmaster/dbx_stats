@@ -873,7 +873,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             -- If the number of running jobs is less than the maximum allowed, run the next job
             IF v_current_parallel_jobs < v_max_parallel_jobs * v_instance_count THEN
                 -- Get the instance with the least number of jobs running
-                SELECT instance_number 
+                SELECT inst_id 
                 INTO v_node_id
                 FROM (
                     SELECT inst_id, COUNT(*) AS job_count
