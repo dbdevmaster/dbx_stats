@@ -67,6 +67,7 @@ grant select on v_$instance to <username>;
 grant select on gv_$instance to <username>;
 grant select on gv_$session to <username>;
 grant select on dba_scheduler_running_jobs to <username>;
+grant select on dba_scheduler_job_run_details <username>; 
 
 ```
 
