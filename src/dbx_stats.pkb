@@ -159,7 +159,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                             END;',
         start_date      => SYSTIMESTAMP,
         end_date        => NULL,
-        enabled         => FALSE,
+        enabled         => FALSE,  -- Change to FALSE
         comments        => 'Gather stats for schema ' || p_schema_name,
         auto_drop       => FALSE
     );
@@ -169,9 +169,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         debugging('set attribute instance_id for job_name: '||p_job_name||' to: '||p_instance_number);
     END IF;
     DBMS_SESSION.SLEEP(1);
-
-    -- Run the job immediately
-    DBMS_SCHEDULER.RUN_JOB(LOWER(p_job_name), FALSE);
 
     COMMIT;
   EXCEPTION
@@ -183,9 +180,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         END IF;
         ROLLBACK;
   END create_gather_job;
-
-
-
   
     -- Autonomous procedure to insert initial job record into the log table
     PROCEDURE insert_job_record(v_g_session_id VARCHAR2, p_schema_name VARCHAR2, p_job_name VARCHAR2, p_instance_number NUMBER, p_session_id VARCHAR2) IS
@@ -996,9 +990,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
     v_running_jobs       NUMBER;
   BEGIN
     v_max_runtime := TO_NUMBER(dbx_stats_manager('max_runtime').get_setting) * 60; -- Convert hours to minutes
-    -- v_max_runtime := 1; -- testing
     v_max_job_runtime := TO_NUMBER(dbx_stats_manager('max_job_duration').get_setting) * 60 + 1; -- Convert hours to minutes and add a few ticks
-    -- v_max_job_runtime := 2; -- testing
 
     -- Get the settings for auto_drop and purge_log
     v_auto_drop := (lower(dbx_stats_manager('job_auto_drop').get_setting) = lower('TRUE'));
@@ -1044,7 +1036,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Check if overall max_runtime is exceeded
             IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_runtime THEN
-                --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
                 DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
                 -- Update job record to STOPPED with additional details
                 v_duration := SYSTIMESTAMP - rec.start_time;
@@ -1054,7 +1045,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Check if individual job max_job_runtime is exceeded
             IF (EXTRACT(MINUTE FROM (SYSTIMESTAMP - rec.start_time))) > v_max_job_runtime THEN
-                --DBMS_SCHEDULER.STOP_JOB(job_name => rec.job_name, force => TRUE);
                 DBMS_SCHEDULER.DROP_JOB(job_name => rec.job_name, defer => FALSE, force => TRUE);
                 -- Update job record to STOPPED with additional details
                 v_duration := SYSTIMESTAMP - rec.start_time;
