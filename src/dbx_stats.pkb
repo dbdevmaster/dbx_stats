@@ -1123,7 +1123,6 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         END IF;
   END watch_jobs;
 
-
   -- Procedure to enable automatic statistics collection
   PROCEDURE enable(
       p_schema_name  VARCHAR2,
