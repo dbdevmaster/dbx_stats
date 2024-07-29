@@ -82,8 +82,12 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
       PRAGMA AUTONOMOUS_TRANSACTION;
       v_offset NUMBER := 0;
       v_limit NUMBER;
+      v_limit_string VARCHAR2(100);
       v_limit_setting dbx_stats_manager := dbx_stats_manager('FETCH_LIMIT'); -- Fetch the limit setting from dbx_stats_manager
   BEGIN
+      v_limit_string := v_limit_setting.get_setting; -- Get the limit setting value
+      v_limit := TO_NUMBER(v_limit_string); -- Convert the VARCHAR2 value to NUMBER
+
       DBMS_SCHEDULER.CREATE_JOB(
         job_name        => LOWER(p_job_name),
         job_type        => 'PLSQL_BLOCK',
@@ -852,7 +856,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                 SELECT COUNT(*)
                 INTO v_current_parallel_jobs
                 FROM gv$session
-                WHERE program = 'dbx_stats_client'
+                WHERE client_info = 'dbx_stats_client'
                 AND CLIENT_IDENTIFIER = g_session_id;
                 debugging('check the number of currently running jobs:' || v_current_parallel_jobs);
 
