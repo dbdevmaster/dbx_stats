@@ -1113,7 +1113,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         END IF;
 
         -- Wait before the next check
-        DBMS_SESSION.SLEEP(60);
+        DBMS_SESSION.SLEEP(5);
     END LOOP;
   EXCEPTION
     WHEN OTHERS THEN
