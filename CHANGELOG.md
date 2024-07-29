@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.0...v1.6.1) (2024-07-29)
+
+
+### Bug Fixes
+
+* [#26](https://github.com/dbdevmaster/dbx_stats/issues/26) wait for job to comoplete before submitting new one not working ([992f31d](https://github.com/dbdevmaster/dbx_stats/commit/992f31d18a2d2653bd1f3d52ea8ae53222042301))
+
 ## [1.6.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.5.11...v1.6.0) (2024-07-27)
 
 
