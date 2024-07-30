@@ -772,6 +772,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
     v_node_id NUMBER;
     v_session_id VARCHAR2(30);
     g_session_id VARCHAR(32);
+    v_initialized BOOLEAN := FALSE;
 
     CURSOR schema_cursor IS
         SELECT username
@@ -844,8 +845,8 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
     END LOOP;
 
-    -- sleep
-    -- DBMS_SESSION.SLEEP(2);
+    --sleep otherwise job will finisehd, need Initialize wait watch job
+    DBMS_SESSION.SLEEP(300);
 
     -- Wait for all jobs to complete
     LOOP
