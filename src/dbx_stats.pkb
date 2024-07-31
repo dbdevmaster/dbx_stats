@@ -1081,7 +1081,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             DBMS_SESSION.SLEEP(10);
             -- Check if job is not running anymore and update the log table
-            IF rec.current_status = 'NOT RUNNING' THEN
+            IF rec.current_status = 'NOT RUNNING' and rec.job_status != 'QUEUED' THEN
                 v_duration := SYSTIMESTAMP - rec.start_time;
                 v_job_status := 'COMPLETED';
                 update_job_record(v_g_session_id, rec.job_name, v_job_status, v_duration, rec.status, rec.error#, rec.additional_info);
