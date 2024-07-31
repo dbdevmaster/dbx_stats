@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.7.0...v1.7.1) (2024-07-31)
+
+
+### Bug Fixes
+
+* get stale stats in Parallel ([cb376e8](https://github.com/dbdevmaster/dbx_stats/commit/cb376e8569f207963c8c0ff81d274ceb0a45ad2a))
+
 ## [1.7.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.3...v1.7.0) (2024-07-31)
 
 
