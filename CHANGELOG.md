@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.7.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.3...v1.7.0) (2024-07-31)
+
+
+### Features
+
+* get stale stats in Parallel ([d2ec74a](https://github.com/dbdevmaster/dbx_stats/commit/d2ec74ac0d94a732248484454309784bdcc45f5f))
+
+
+### Bug Fixes
+
+* jobs status queued not getting enabled [#32](https://github.com/dbdevmaster/dbx_stats/issues/32) ([b5783bd](https://github.com/dbdevmaster/dbx_stats/commit/b5783bd8d3a53ecda04bd6b3eeeceabaf07ced99))
+
 ### [1.6.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.2...v1.6.3) (2024-07-29)
 
 
