@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.7.2...v1.7.3) (2024-07-31)
+
+
+### Bug Fixes
+
+* get stale stats using bind for p_degree ([9f39d17](https://github.com/dbdevmaster/dbx_stats/commit/9f39d17923c00bdd52cfd4c5e6a34fdc6fddaff6))
+
+### [1.7.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.7.1...v1.7.2) (2024-07-31)
+
+
+### Bug Fixes
+
+* get stale stats using bind for p_degree ([23f34ed](https://github.com/dbdevmaster/dbx_stats/commit/23f34ed0e835aaf2effc731413f741fd6793661e))
+
+### [1.7.1](https://github.com/dbdevmaster/dbx_stats/compare/v1.7.0...v1.7.1) (2024-07-31)
+
+
+### Bug Fixes
+
+* get stale stats in Parallel ([cb376e8](https://github.com/dbdevmaster/dbx_stats/commit/cb376e8569f207963c8c0ff81d274ceb0a45ad2a))
+
+## [1.7.0](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.3...v1.7.0) (2024-07-31)
+
+
+### Features
+
+* get stale stats in Parallel ([d2ec74a](https://github.com/dbdevmaster/dbx_stats/commit/d2ec74ac0d94a732248484454309784bdcc45f5f))
+
+
+### Bug Fixes
+
+* jobs status queued not getting enabled [#32](https://github.com/dbdevmaster/dbx_stats/issues/32) ([b5783bd](https://github.com/dbdevmaster/dbx_stats/commit/b5783bd8d3a53ecda04bd6b3eeeceabaf07ced99))
+
 ### [1.6.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.6.2...v1.6.3) (2024-07-29)
 
 
