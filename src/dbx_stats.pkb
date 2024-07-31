@@ -578,12 +578,13 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             END LOOP;
 
             -- Check table statistics status
-            v_sql := 'SELECT /*+ PARALLEL(ts, ' || p_degree || ') */ ts.table_name, ts.stale_stats, t.partitioned ' ||
+            v_sql := 'SELECT /*+ PARALLEL(ts, :p_degree) */ ts.table_name, ts.stale_stats, t.partitioned ' ||
                  'FROM dba_tab_statistics ts ' ||
                  'JOIN dba_tables t ON ts.owner = t.owner AND ts.table_name = t.table_name ' ||
                  'WHERE ts.owner = :schema_username';
+
         
-            OPEN cur FOR v_sql USING schema_rec.username;
+            OPEN cur FOR v_sql USING p_degree, schema_rec.username;
             LOOP
                 FETCH cur INTO table_stat_rec;
                 EXIT WHEN cur%NOTFOUND;
@@ -601,12 +602,12 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             CLOSE cur;
 
             -- Check index statistics status
-            v_sql := 'SELECT /*+ PARALLEL(dis, ' || p_degree || ') */ dis.index_name, dis.stale_stats, i.partitioned ' ||
+            v_sql := 'SELECT /*+ PARALLEL(dis, :p_degree) */ dis.index_name, dis.stale_stats, i.partitioned ' ||
                  'FROM dba_ind_statistics dis ' ||
                  'JOIN dba_indexes i ON dis.owner = i.owner AND dis.index_name = i.index_name ' ||
                  'WHERE dis.owner = :schema_username';
 
-            OPEN cur FOR v_sql USING schema_rec.username;
+            OPEN cur FOR v_sql USING p_degree, schema_rec.username;
             LOOP
                 FETCH cur INTO index_stat_rec;
                 EXIT WHEN cur%NOTFOUND;
