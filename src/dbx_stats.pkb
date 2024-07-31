@@ -110,7 +110,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                 
                                 -- Gather stale index stats
                                 LOOP
-                                    FOR rec IN (SELECT index_name 
+                                    FOR rec IN (SELECT distinct index_name 
                                                 FROM (SELECT index_name, ROWNUM rnum 
                                                       FROM dba_ind_statistics 
                                                       WHERE owner = ''' || p_schema_name || ''' 
@@ -134,7 +134,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                                 
                                 -- Gather empty index stats
                                 LOOP
-                                    FOR rec IN (SELECT index_name 
+                                    FOR rec IN (SELECT distinct index_name 
                                                 FROM (SELECT index_name, ROWNUM rnum 
                                                       FROM dba_ind_statistics 
                                                       WHERE owner = ''' || p_schema_name || ''' 
