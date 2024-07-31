@@ -447,6 +447,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
         v_table_stats_status VARCHAR2(4000);
         v_index_stats_status VARCHAR2(4000);
         v_partitioned_status VARCHAR2(1);
+        v_sql clob;
         CURSOR schema_cursor IS
             SELECT username
             FROM dba_users
@@ -454,6 +455,23 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
               AND (v_schema_to_check = '__ALL__' OR
                    (v_schema_to_check LIKE '__REGEXP__%' AND REGEXP_LIKE(LOWER(username), v_regexp)) OR
                    LOWER(username) = LOWER(v_schema_to_check));
+
+        TYPE table_stat_record IS RECORD (
+          table_name        VARCHAR2(128),
+          stale_stats       VARCHAR2(3),
+          partitioned       VARCHAR2(3)
+        );
+
+        TYPE index_stat_record IS RECORD (
+          index_name        VARCHAR2(128),
+          stale_stats       VARCHAR2(3),
+          partitioned       VARCHAR2(3)
+        );
+
+        table_stat_rec table_stat_record;
+        index_stat_rec index_stat_record;
+
+        cur SYS_REFCURSOR;
 
     BEGIN
         -- Set application info
@@ -560,12 +578,15 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             END LOOP;
 
             -- Check table statistics status
-            FOR table_stat_rec IN (
-                SELECT /*+ PARALLEL(ts, p_degree) */ ts.table_name, ts.stale_stats, t.partitioned
-                FROM dba_tab_statistics ts
-                JOIN dba_tables t ON ts.owner = t.owner AND ts.table_name = t.table_name
-                WHERE ts.owner = schema_rec.username
-            ) LOOP
+            v_sql := 'SELECT /*+ PARALLEL(ts, ' || p_degree || ') */ ts.table_name, ts.stale_stats, t.partitioned ' ||
+                 'FROM dba_tab_statistics ts ' ||
+                 'JOIN dba_tables t ON ts.owner = t.owner AND ts.table_name = t.table_name ' ||
+                 'WHERE ts.owner = :schema_username';
+        
+            OPEN cur FOR v_sql USING schema_rec.username;
+            LOOP
+                FETCH cur INTO table_stat_rec;
+                EXIT WHEN cur%NOTFOUND;
                 IF table_stat_rec.stale_stats = 'YES' THEN
                     PIPE ROW(dbx_stale_stats_record(
                         schema_rec.username,
@@ -577,14 +598,18 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                     ));
                 END IF;
             END LOOP;
+            CLOSE cur;
 
             -- Check index statistics status
-            FOR index_stat_rec IN (
-                SELECT /*+ PARALLEL(dis, p_degree) */ dis.index_name, dis.stale_stats, i.partitioned
-                FROM dba_ind_statistics dis
-                JOIN dba_indexes i ON dis.owner = i.owner AND dis.index_name = i.index_name
-                WHERE dis.owner = schema_rec.username
-            ) LOOP
+            v_sql := 'SELECT /*+ PARALLEL(dis, ' || p_degree || ') */ dis.index_name, dis.stale_stats, i.partitioned ' ||
+                 'FROM dba_ind_statistics dis ' ||
+                 'JOIN dba_indexes i ON dis.owner = i.owner AND dis.index_name = i.index_name ' ||
+                 'WHERE dis.owner = :schema_username';
+
+            OPEN cur FOR v_sql USING schema_rec.username;
+            LOOP
+                FETCH cur INTO index_stat_rec;
+                EXIT WHEN cur%NOTFOUND;
                 IF index_stat_rec.stale_stats = 'YES' THEN
                     PIPE ROW(dbx_stale_stats_record(
                         schema_rec.username,
@@ -596,6 +621,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
                     ));
                 END IF;
             END LOOP;
+            CLOSE cur;
         END LOOP;
 
         -- Clear application info
