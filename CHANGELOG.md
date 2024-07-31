@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.3](https://github.com/dbdevmaster/dbx_stats/compare/v1.7.2...v1.7.3) (2024-07-31)
+
+
+### Bug Fixes
+
+* get stale stats using bind for p_degree ([9f39d17](https://github.com/dbdevmaster/dbx_stats/commit/9f39d17923c00bdd52cfd4c5e6a34fdc6fddaff6))
+
 ### [1.7.2](https://github.com/dbdevmaster/dbx_stats/compare/v1.7.1...v1.7.2) (2024-07-31)
 
 
