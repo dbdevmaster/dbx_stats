@@ -231,7 +231,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
 
     -- Autonomous procedure to get stale objects
-    PROCEDURE gather_stale_objects(schema_name VARCHAR2, objlist OUT dbms_stats.objecttab) IS
+    PROCEDURE gather_stale_objects(schema_name VARCHAR2, objlist OUT dbms_stats.objecttab, p_degree IN NUMBER) IS
     PRAGMA AUTONOMOUS_TRANSACTION;
     BEGIN
         -- Set module and action info for gather_stale_objects
@@ -255,7 +255,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
     END gather_stale_objects;
 
     -- Autonomous procedure to get empty objects
-    PROCEDURE gather_empty_objects(schema_name VARCHAR2, objlist OUT dbms_stats.objecttab) IS
+    PROCEDURE gather_empty_objects(schema_name VARCHAR2, objlist OUT dbms_stats.objecttab, p_degree IN NUMBER) IS
     PRAGMA AUTONOMOUS_TRANSACTION;
     BEGIN
         -- Set module and action info for gather_empty_objects
@@ -437,7 +437,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
             END IF;
     END get_prefs_schema_tbls;
 
-    FUNCTION get_stale_stats_schema(v_schema_to_check VARCHAR2)
+    FUNCTION get_stale_stats_schema(v_schema_to_check VARCHAR2, p_degree IN NUMBER default 4)
         RETURN dbx_stale_stats_table PIPELINED
     IS
         v_regexp VARCHAR2(128);
@@ -475,11 +475,11 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Set action for gathering stale objects
             DBMS_APPLICATION_INFO.SET_ACTION('Gathering Stale Objects for Schema: ' || schema_rec.username);
-            gather_stale_objects(schema_rec.username, mystaleobjs);
+            gather_stale_objects(schema_rec.username, mystaleobjs, p_degree);
 
             -- Set action for gathering empty objects
             DBMS_APPLICATION_INFO.SET_ACTION('Gathering Empty Objects for Schema: ' || schema_rec.username);
-            gather_empty_objects(schema_rec.username, myemptyobjs);
+            gather_empty_objects(schema_rec.username, myemptyobjs, p_degree);
 
             -- Process the collection of stale objects
             FOR i IN 1..mystaleobjs.COUNT LOOP
@@ -561,7 +561,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Check table statistics status
             FOR table_stat_rec IN (
-                SELECT ts.table_name, ts.stale_stats, t.partitioned
+                SELECT /*+ PARALLEL(ts, p_degree) */ ts.table_name, ts.stale_stats, t.partitioned
                 FROM dba_tab_statistics ts
                 JOIN dba_tables t ON ts.owner = t.owner AND ts.table_name = t.table_name
                 WHERE ts.owner = schema_rec.username
@@ -580,7 +580,7 @@ CREATE OR REPLACE PACKAGE BODY dbx_stats AS
 
             -- Check index statistics status
             FOR index_stat_rec IN (
-                SELECT dis.index_name, dis.stale_stats, i.partitioned
+                SELECT /*+ PARALLEL(dis, p_degree) */ dis.index_name, dis.stale_stats, i.partitioned
                 FROM dba_ind_statistics dis
                 JOIN dba_indexes i ON dis.owner = i.owner AND dis.index_name = i.index_name
                 WHERE dis.owner = schema_rec.username

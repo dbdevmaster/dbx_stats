@@ -142,7 +142,7 @@ SELECT * FROM TABLE(dbx_stats.get_prefs_schema_tbls('__REGEXP__HR'));
 Retrieves stale statistics for a specific schema.
 
 ```sql
-SELECT * FROM TABLE(dbx_stats.get_stale_stats_schema('HR'));
+SELECT * FROM TABLE(dbx_stats.get_stale_stats_schema('HR', 4));
 ```
 
 ### gather_schema_stats
@@ -250,7 +250,7 @@ SELECT
     stale_stats,
     COUNT(*) AS status_count
 FROM 
-    TABLE(dbx_stats.get_stale_stats_schema('HR'))
+    TABLE(dbx_stats.get_stale_stats_schema('HR',4))
 GROUP BY 
     schema_name, object_type, partitioned, stale_stats
 ORDER BY 
@@ -265,7 +265,7 @@ SELECT
     stale_stats,
     COUNT(*) AS status_count
 FROM 
-    TABLE(dbx_stats.get_stale_stats_schema('HR'))
+    TABLE(dbx_stats.get_stale_stats_schema('HR',4))
 GROUP BY 
     object_type, partitioned, stale_stats
 ORDER BY 
